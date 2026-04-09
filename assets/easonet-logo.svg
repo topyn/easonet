@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="52" viewBox="0 0 220 52" role="img" aria-label="Easonet logo">
+  <title>Easonet</title>
+  <!-- E mark -->
+  <rect x="0" y="10" width="30" height="9" rx="2.5" fill="#ff4d1c"/>
+  <rect x="0" y="22" width="21" height="9" rx="2.5" fill="#ff4d1c"/>
+  <rect x="0" y="34" width="30" height="9" rx="2.5" fill="#ff4d1c"/>
+  <!-- wordmark: requires Syne 800 — embed or use web font -->
+  <text x="46" y="38"
+    font-family="'Syne', 'Arial Black', sans-serif"
+    font-weight="800"
+    font-size="30"
+    fill="#0a0a0a"
+    letter-spacing="-1.2">easonet</text>
+</svg>

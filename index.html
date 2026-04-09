@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easonet — Independent Software Reviews</title>
+<meta name="description" content="Independent, no-nonsense software reviews. Find the right tool for your business in 60 seconds with our free software finder.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #ffffff;
+  --bg2: #f7f7f5;
+  --bg3: #efeeeb;
+  --ink: #0c0c0a;
+  --ink2: #5a5a55;
+  --ink3: #a0a09a;
+  --accent: #ff4d1c;
+  --accent2: #ff6b3d;
+  --accent-bg: #fff3ef;
+  --border: #e8e8e4;
+  --border2: #d4d4ce;
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── NAV ── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 48px; height: 64px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo { display: inline-flex; align-items: center; text-decoration: none; }
+.nav-links { display: flex; align-items: center; gap: 32px; }
+.nav-link { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 400; color: var(--ink2); text-decoration: none; letter-spacing: 0.02em; transition: color .15s; }
+.nav-link:hover { color: var(--ink); }
+.nav-cta {
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px;
+  color: #fff; background: var(--accent); border: none;
+  padding: 9px 22px; border-radius: 100px; text-decoration: none;
+  transition: background .15s, transform .15s; letter-spacing: -0.2px;
+}
+.nav-cta:hover { background: #e63d0a; transform: translateY(-1px); }
+@media(max-width:640px) { nav { padding: 0 24px; } .nav-links { display: none; } }
+
+/* ── HERO ── */
+.hero {
+  min-height: calc(100vh - 64px);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 80px 48px 64px;
+  max-width: 1100px; margin: 0 auto;
+  position: relative;
+}
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+@media(max-width:800px) { .hero-grid { grid-template-columns: 1fr; gap: 48px; } }
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 400;
+  color: var(--accent); letter-spacing: 0.08em;
+  margin-bottom: 24px;
+}
+.hero-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.hero h1 {
+  font-weight: 800; font-size: clamp(44px, 6vw, 72px);
+  line-height: 1.0; letter-spacing: -3px; color: var(--ink);
+  margin-bottom: 28px;
+}
+.hero h1 .accent { color: var(--accent); }
+.hero h1 .line { display: block; }
+
+.hero-sub {
+  font-family: 'DM Mono', monospace; font-weight: 300;
+  font-size: 15px; color: var(--ink2); line-height: 1.8;
+  margin-bottom: 40px; max-width: 420px;
+}
+
+.hero-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.btn-hero {
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
+  color: #fff; background: var(--accent); border: none;
+  padding: 16px 32px; border-radius: 100px; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: all .18s; letter-spacing: -0.3px;
+}
+.btn-hero:hover { background: #e63d0a; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(255,77,28,.3); }
+.btn-hero-ghost {
+  font-family: 'DM Mono', monospace; font-size: 13px; color: var(--ink2);
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  transition: color .15s;
+}
+.btn-hero-ghost:hover { color: var(--ink); }
+
+.hero-trust {
+  display: flex; align-items: center; gap: 24px; margin-top: 48px;
+  flex-wrap: wrap;
+}
+.trust-pill {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink3);
+}
+.trust-pill-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: .5; }
+
+/* hero right — stat block */
+.hero-stats {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden;
+}
+.stat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 28px; border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  transition: background .15s;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-row:hover { background: var(--bg2); }
+.stat-label { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink2); }
+.stat-value { font-weight: 800; font-size: 28px; letter-spacing: -1px; color: var(--ink); }
+.stat-value.accent { color: var(--accent); }
+.stat-tag {
+  font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent);
+  background: var(--accent-bg); padding: 3px 10px; border-radius: 100px;
+}
+
+/* ── SECTION BASE ── */
+section { padding: 96px 48px; }
+@media(max-width:640px) { section { padding: 64px 24px; } }
+.section-inner { max-width: 1100px; margin: 0 auto; }
+.section-tag {
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink3);
+  letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-tag::before { content:''; display: block; width: 24px; height: 1px; background: var(--border2); }
+.section-h { font-weight: 800; font-size: clamp(30px, 4vw, 48px); letter-spacing: -2px; line-height: 1.05; color: var(--ink); margin-bottom: 16px; }
+.section-sub { font-family: 'DM Mono', monospace; font-weight: 300; font-size: 14px; color: var(--ink2); line-height: 1.8; max-width: 520px; }
+
+/* ── HOW IT WORKS ── */
+.how { background: var(--bg2); }
+.steps {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+  margin-top: 56px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+@media(max-width:720px) { .steps { grid-template-columns: 1fr; } }
+.step {
+  background: var(--bg); padding: 36px 32px;
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+.step:last-child { border-right: none; }
+.step-num {
+  font-family: 'DM Mono', monospace; font-weight: 500; font-size: 11px;
+  color: var(--accent); letter-spacing: 0.1em; margin-bottom: 20px;
+  display: block;
+}
+.step-icon {
+  width: 48px; height: 48px; background: var(--accent-bg);
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+}
+.step h3 { font-weight: 700; font-size: 18px; letter-spacing: -0.5px; color: var(--ink); margin-bottom: 10px; }
+.step p { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--ink2); line-height: 1.7; font-weight: 300; }
+
+/* ── CATEGORIES ── */
+.cats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px; margin-top: 56px;
+}
+.cat-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 28px 24px;
+  text-decoration: none; display: flex; flex-direction: column; gap: 12px;
+  transition: all .18s; position: relative; overflow: hidden;
+}
+.cat-card::after {
+  content: '→'; position: absolute; right: 20px; top: 50%;
+  transform: translateY(-50%) translateX(4px);
+  font-size: 18px; color: var(--accent); opacity: 0;
+  transition: all .18s;
+}
+.cat-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(255,77,28,.08); }
+.cat-card:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+.cat-card-icon { font-size: 28px; }
+.cat-card-name { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; color: var(--ink); }
+.cat-card-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink3); }
+
+/* ── FINDER CTA ── */
+.finder-cta {
+  background: var(--ink); border-radius: var(--radius);
+  padding: 64px 64px; margin-top: 80px;
+  display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center;
+}
+@media(max-width:700px) { .finder-cta { grid-template-columns: 1fr; padding: 40px 32px; } }
+.finder-cta h2 { font-weight: 800; font-size: clamp(24px, 3vw, 38px); letter-spacing: -1.5px; color: #fff; line-height: 1.1; }
+.finder-cta h2 span { color: var(--accent); }
+.finder-cta p { font-family: 'DM Mono', monospace; font-size: 13px; color: rgba(255,255,255,.5); margin-top: 12px; line-height: 1.7; font-weight: 300; }
+.btn-finder {
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
+  color: var(--ink); background: #fff; border: none;
+  padding: 18px 36px; border-radius: 100px; text-decoration: none;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;
+  transition: all .18s; letter-spacing: -0.3px;
+}
+.btn-finder:hover { background: var(--accent); color: #fff; transform: translateY(-2px); }
+
+/* ── WHY EASONET ── */
+.why { background: var(--bg2); }
+.why-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; margin-top: 56px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+@media(max-width:640px) { .why-grid { grid-template-columns: 1fr; } }
+.why-item { background: var(--bg); padding: 36px 32px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.why-item:nth-child(2n) { border-right: none; }
+.why-item:nth-last-child(-n+2) { border-bottom: none; }
+@media(max-width:640px) { .why-item { border-right: none; } .why-item:last-child { border-bottom: none; } }
+.why-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+.why-item h3 { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; color: var(--ink); margin-bottom: 8px; }
+.why-item p { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink2); line-height: 1.75; font-weight: 300; }
+
+/* ── RECENT REVIEWS ── */
+.reviews-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
+@media(max-width:800px) { .reviews-grid { grid-template-columns: 1fr 1fr; } }
+@media(max-width:500px) { .reviews-grid { grid-template-columns: 1fr; } }
+.review-card {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 24px; text-decoration: none; display: flex; flex-direction: column; gap: 12px;
+  transition: all .18s; background: var(--bg);
+}
+.review-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,.06); }
+.review-cat { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
+.review-name { font-weight: 700; font-size: 17px; letter-spacing: -0.4px; color: var(--ink); }
+.review-snippet { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink2); line-height: 1.65; font-weight: 300; flex: 1; }
+.review-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.review-score { font-weight: 800; font-size: 13px; color: var(--accent); }
+.review-link { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink3); }
+
+/* ── FOOTER ── */
+footer {
+  background: var(--ink); padding: 56px 48px 40px;
+}
+@media(max-width:640px) { footer { padding: 48px 24px 32px; } }
+.footer-inner { max-width: 1100px; margin: 0 auto; }
+.footer-top { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 48px; }
+@media(max-width:800px) { .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; } }
+@media(max-width:480px) { .footer-top { grid-template-columns: 1fr; } }
+.footer-col-title { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,.3); margin-bottom: 16px; }
+.footer-link { display: block; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 300; color: rgba(255,255,255,.55); text-decoration: none; margin-bottom: 10px; transition: color .15s; }
+.footer-link:hover { color: #fff; }
+.footer-bottom { border-top: 1px solid rgba(255,255,255,.08); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-copy { font-family: 'DM Mono', monospace; font-size: 11px; color: rgba(255,255,255,.25); font-weight: 300; }
+.footer-disclosure { font-family: 'DM Mono', monospace; font-size: 11px; color: rgba(255,255,255,.2); font-weight: 300; max-width: 500px; line-height: 1.6; }
+.footer-disclosure a { color: rgba(255,255,255,.35); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── ANIMATIONS ── */
+.reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-delay-1 { transition-delay: .1s; }
+.reveal-delay-2 { transition-delay: .2s; }
+.reveal-delay-3 { transition-delay: .3s; }
+.reveal-delay-4 { transition-delay: .4s; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <svg width="140" height="33" viewBox="0 0 220 52" xmlns="http://www.w3.org/2000/svg" aria-label="Easonet">
+      <rect x="0" y="10" width="30" height="9" rx="2.5" fill="#ff4d1c"/>
+      <rect x="0" y="22" width="21" height="9" rx="2.5" fill="#ff4d1c"/>
+      <rect x="0" y="34" width="30" height="9" rx="2.5" fill="#ff4d1c"/>
+      <text x="46" y="38" font-family="'Syne','Arial Black',sans-serif" font-weight="800" font-size="30" fill="#0c0c0a" letter-spacing="-1.2">easonet</text>
+    </svg>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" href="#categories">Categories</a>
+    <a class="nav-link" href="#why">About</a>
+    <a class="nav-link" href="finder.html">Finder</a>
+    <a class="nav-cta" href="finder.html">Find my software →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div style="max-width:1100px;margin:0 auto;padding:0 48px">
+  <div class="hero" style="padding-left:0;padding-right:0">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-eyebrow reveal"><span class="hero-eyebrow-dot"></span>Independent software reviews</div>
+        <h1 class="reveal reveal-delay-1">
+          <span class="line">The right</span>
+          <span class="line">software,</span>
+          <span class="line accent">found fast.</span>
+        </h1>
+        <p class="hero-sub reveal reveal-delay-2">No sponsored rankings. No affiliate bias. Just clear, honest reviews and a free tool that matches you to the right software in 60 seconds.</p>
+        <div class="hero-actions reveal reveal-delay-3">
+          <a class="btn-hero" href="finder.html">Try the software finder →</a>
+          <a class="btn-hero-ghost" href="#categories">Browse categories ↓</a>
+        </div>
+        <div class="hero-trust reveal reveal-delay-4">
+          <span class="trust-pill"><span class="trust-pill-dot"></span>240+ tools reviewed</span>
+          <span class="trust-pill"><span class="trust-pill-dot"></span>No sponsored picks</span>
+          <span class="trust-pill"><span class="trust-pill-dot"></span>Updated monthly</span>
+        </div>
+      </div>
+      <div class="reveal reveal-delay-2">
+        <div class="hero-stats">
+          <div class="stat-row">
+            <span class="stat-label">Tools reviewed</span>
+            <span class="stat-value">240+</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Categories covered</span>
+            <span class="stat-value">5</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Avg. time to find a match</span>
+            <span class="stat-value accent">60s</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Sponsored rankings</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="stat-value" style="font-size:20px">Zero</span>
+              <span class="stat-tag">guaranteed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <div class="section-inner">
+    <div class="section-tag reveal">How it works</div>
+    <h2 class="section-h reveal">Three steps to the<br>right tool.</h2>
+    <p class="section-sub reveal">No endless comparison tables. No "best of" lists that never change. Just a clear answer built for your situation.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <span class="step-num">01 —</span>
+        <div class="step-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="2" y="3" width="18" height="4" rx="1.5" fill="#ff4d1c"/><rect x="2" y="9.5" width="12" height="4" rx="1.5" fill="#ff4d1c"/><rect x="2" y="16" width="18" height="4" rx="1.5" fill="#ff4d1c"/></svg>
+        </div>
+        <h3>Pick your category</h3>
+        <p>Creator tools, AI, HR, CRM or SEO — choose the type of software you're looking for and we'll narrow right in.</p>
+      </div>
+      <div class="step reveal reveal-delay-1">
+        <span class="step-num">02 —</span>
+        <div class="step-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="#ff4d1c" stroke-width="2"/><path d="M11 7v4l3 3" stroke="#ff4d1c" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Answer 4 questions</h3>
+        <p>Tell us your team size, budget, and what matters most. Takes 60 seconds. No email required.</p>
+      </div>
+      <div class="step reveal reveal-delay-2">
+        <span class="step-num">03 —</span>
+        <div class="step-icon">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 12l5 5L18 6" stroke="#ff4d1c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Get your match</h3>
+        <p>One clear recommendation with a match score and the exact reasons it fits your situation — not a generic top-10 list.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CATEGORIES -->
+<section id="categories">
+  <div class="section-inner">
+    <div class="section-tag reveal">What we cover</div>
+    <h2 class="section-h reveal">Five categories.<br>Hundreds of tools.</h2>
+    <p class="section-sub reveal">We go deep in the categories that matter most to growing businesses — with hands-on testing, not just spec comparisons.</p>
+    <div class="cats-grid">
+      <a class="cat-card reveal" href="finder.html">
+        <div class="cat-card-icon">✍️</div>
+        <div class="cat-card-name">Creator tools</div>
+        <div class="cat-card-count">Newsletters · Podcasts · Courses</div>
+      </a>
+      <a class="cat-card reveal reveal-delay-1" href="finder.html">
+        <div class="cat-card-icon">⚡</div>
+        <div class="cat-card-name">AI tools</div>
+        <div class="cat-card-count">Writing · Automation · Research</div>
+      </a>
+      <a class="cat-card reveal reveal-delay-2" href="finder.html">
+        <div class="cat-card-icon">👥</div>
+        <div class="cat-card-name">HR & team</div>
+        <div class="cat-card-count">Remote work · Hiring · Payroll</div>
+      </a>
+      <a class="cat-card reveal reveal-delay-3" href="finder.html">
+        <div class="cat-card-icon">💼</div>
+        <div class="cat-card-name">CRM & sales</div>
+        <div class="cat-card-count">Pipeline · Outreach · Customer data</div>
+      </a>
+      <a class="cat-card reveal reveal-delay-4" href="finder.html">
+        <div class="cat-card-icon">📈</div>
+        <div class="cat-card-name">SEO & marketing</div>
+        <div class="cat-card-count">Search · Content · Analytics</div>
+      </a>
+    </div>
+
+    <!-- finder CTA block -->
+    <div class="finder-cta reveal">
+      <div>
+        <h2>Not sure where to start?<br><span>Let the finder decide.</span></h2>
+        <p>Answer 4 questions and get a personalised recommendation — free, no signup, 60 seconds.</p>
+      </div>
+      <a class="btn-finder" href="finder.html">Open the finder →</a>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURED REVIEWS -->
+<section style="background:var(--bg2)" id="reviews">
+  <div class="section-inner">
+    <div class="section-tag reveal">Latest reviews</div>
+    <h2 class="section-h reveal">What we've been<br>testing.</h2>
+    <p class="section-sub reveal">Hands-on, independently tested. We use these tools ourselves before we recommend them.</p>
+    <div class="reviews-grid">
+      <a class="review-card reveal" href="finder.html">
+        <div class="review-cat">Creator tools</div>
+        <div class="review-name">Beehiiv</div>
+        <div class="review-snippet">The newsletter platform that actually wants you to grow. Built-in ads, referral tools, and analytics that put Mailchimp to shame.</div>
+        <div class="review-meta"><span class="review-score">96% match</span><span class="review-link">Read review →</span></div>
+      </a>
+      <a class="review-card reveal reveal-delay-1" href="finder.html">
+        <div class="review-cat">CRM & sales</div>
+        <div class="review-name">Pipedrive</div>
+        <div class="review-snippet">The CRM your sales team will actually use. Visual pipeline, smart automations, and an interface that doesn't require a training course.</div>
+        <div class="review-meta"><span class="review-score">95% match</span><span class="review-link">Read review →</span></div>
+      </a>
+      <a class="review-card reveal reveal-delay-2" href="finder.html">
+        <div class="review-cat">HR & team</div>
+        <div class="review-name">Deel</div>
+        <div class="review-snippet">Hiring globally used to mean lawyers and local entities. Deel removes that entirely — pay anyone, anywhere, fully compliant.</div>
+        <div class="review-meta"><span class="review-score">95% match</span><span class="review-link">Read review →</span></div>
+      </a>
+      <a class="review-card reveal" href="finder.html">
+        <div class="review-cat">SEO & marketing</div>
+        <div class="review-name">Semrush</div>
+        <div class="review-snippet">The most complete SEO suite on the market. Overkill for beginners, indispensable for anyone serious about organic growth.</div>
+        <div class="review-meta"><span class="review-score">94% match</span><span class="review-link">Read review →</span></div>
+      </a>
+      <a class="review-card reveal reveal-delay-1" href="finder.html">
+        <div class="review-cat">AI tools</div>
+        <div class="review-name">Notion AI</div>
+        <div class="review-snippet">AI that lives where your work already lives. No switching tabs, no copy-pasting. The most underrated AI product of 2025.</div>
+        <div class="review-meta"><span class="review-score">94% match</span><span class="review-link">Read review →</span></div>
+      </a>
+      <a class="review-card reveal reveal-delay-2" href="finder.html">
+        <div class="review-cat">Creator tools</div>
+        <div class="review-name">Kajabi</div>
+        <div class="review-snippet">One subscription that replaces five tools. If you're selling knowledge online, Kajabi is the platform that grows with you.</div>
+        <div class="review-meta"><span class="review-score">91% match</span><span class="review-link">Read review →</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- WHY EASONET -->
+<section id="why">
+  <div class="section-inner">
+    <div class="section-tag reveal">Why Easonet</div>
+    <h2 class="section-h reveal">Reviews you can<br>actually trust.</h2>
+    <p class="section-sub reveal">The software review industry has a problem. Sponsored rankings, affiliate bias, and outdated comparisons that haven't been updated in years. We're fixing that.</p>
+    <div class="why-grid">
+      <div class="why-item reveal">
+        <div class="why-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2l1.8 5.4H17l-4.4 3.2 1.7 5.2L10 13l-4.3 2.8 1.7-5.2L3 7.4h5.2L10 2z" fill="#ff4d1c"/></svg>
+        </div>
+        <h3>Independently tested</h3>
+        <p>We sign up, use the product, and test it against real tasks before writing a word. No review is based on a vendor demo or press release.</p>
+      </div>
+      <div class="why-item reveal reveal-delay-1">
+        <div class="why-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3" stroke="#ff4d1c" stroke-width="2"/><path d="M7 10l2.5 2.5L13 8" stroke="#ff4d1c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>No sponsored rankings</h3>
+        <p>Advertisers cannot pay to appear higher in our rankings or recommendations. Our affiliate links never change which tool we recommend — only whether we earn a commission.</p>
+      </div>
+      <div class="why-item reveal">
+        <div class="why-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#ff4d1c" stroke-width="2"/><path d="M10 6v4l3 2" stroke="#ff4d1c" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Updated monthly</h3>
+        <p>Software changes fast. We revisit every review when tools ship major updates, pricing changes, or new competitors emerge. You'll never read a review from 2022 dressed up as current.</p>
+      </div>
+      <div class="why-item reveal reveal-delay-1">
+        <div class="why-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3C6.13 3 3 6.13 3 10s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7zm0 3l1.5 4H14l-2.5 1.8 1 3L10 14l-2.5 1.8 1-3L6 11h2.5L10 6z" fill="#ff4d1c"/></svg>
+        </div>
+        <h3>Built for real decisions</h3>
+        <p>Every recommendation accounts for your team size, budget, and specific use case. We built the software finder because "best CRM" is a useless answer — "best CRM for a 3-person sales team on $30/month" is not.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div>
+        <svg width="120" height="28" viewBox="0 0 220 52" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:16px" aria-label="Easonet">
+          <rect x="0" y="10" width="30" height="9" rx="2.5" fill="#ff4d1c"/>
+          <rect x="0" y="22" width="21" height="9" rx="2.5" fill="#ff4d1c"/>
+          <rect x="0" y="34" width="30" height="9" rx="2.5" fill="#ff4d1c"/>
+          <text x="46" y="38" font-family="'Syne','Arial Black',sans-serif" font-weight="800" font-size="30" fill="#ffffff" letter-spacing="-1.2">easonet</text>
+        </svg>
+        <p style="font-family:'DM Mono',monospace;font-size:12px;color:rgba(255,255,255,.3);font-weight:300;line-height:1.7;max-width:200px">Independent software reviews for growing businesses.</p>
+      </div>
+      <div>
+        <div class="footer-col-title">Tools</div>
+        <a class="footer-link" href="finder.html">Software finder</a>
+        <a class="footer-link" href="#categories">All categories</a>
+        <a class="footer-link" href="#reviews">Latest reviews</a>
+      </div>
+      <div>
+        <div class="footer-col-title">Categories</div>
+        <a class="footer-link" href="finder.html">Creator tools</a>
+        <a class="footer-link" href="finder.html">AI tools</a>
+        <a class="footer-link" href="finder.html">HR & team</a>
+        <a class="footer-link" href="finder.html">CRM & sales</a>
+        <a class="footer-link" href="finder.html">SEO & marketing</a>
+      </div>
+      <div>
+        <div class="footer-col-title">Company</div>
+        <a class="footer-link" href="#why">About</a>
+        <a class="footer-link" href="#">Disclosure</a>
+        <a class="footer-link" href="#">Contact</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2026 Easonet. All rights reserved.</div>
+      <div class="footer-disclosure">Easonet earns affiliate commissions from some links on this site — at no extra cost to you. This never influences our rankings or recommendations. <a href="#">Read our full disclosure.</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
