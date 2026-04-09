@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#1a0800"/>
+  <!-- sprocket / hub icon -->
+  <circle cx="400" cy="300" r="70" fill="#ff7a59"/>
+  <circle cx="400" cy="300" r="35" fill="#1a0800"/>
+  <rect x="388" y="195" width="24" height="50" rx="8" fill="#ff7a59"/>
+  <rect x="388" y="355" width="24" height="50" rx="8" fill="#ff7a59"/>
+  <rect x="245" y="288" width="50" height="24" rx="8" fill="#ff7a59"/>
+  <rect x="505" y="288" width="50" height="24" rx="8" fill="#ff7a59"/>
+  <rect x="282" y="232" width="50" height="24" rx="8" fill="#ff7a59" transform="rotate(45 307 244)"/>
+  <rect x="468" y="232" width="50" height="24" rx="8" fill="#ff7a59" transform="rotate(-45 493 244)"/>
+  <rect x="282" y="344" width="50" height="24" rx="8" fill="#ff7a59" transform="rotate(-45 307 356)"/>
+  <rect x="468" y="344" width="50" height="24" rx="8" fill="#ff7a59" transform="rotate(45 493 356)"/>
+  <text x="400" y="500" font-family="'Arial Black', sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle" letter-spacing="-1">hubspot</text>
+  <rect x="280" y="532" width="240" height="36" rx="18" fill="#ff7a59" opacity="0.12"/>
+  <text x="400" y="556" font-family="Arial, sans-serif" font-weight="500" font-size="16" fill="#ff7a59" text-anchor="middle" letter-spacing="1">CRM PLATFORM</text>
+</svg>

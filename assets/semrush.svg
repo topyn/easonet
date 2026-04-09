@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#0a0f1e"/>
+  <!-- bar chart -->
+  <rect x="210" y="360" width="60" height="80" rx="6" fill="#ff642b"/>
+  <rect x="290" y="300" width="60" height="140" rx="6" fill="#ff642b" opacity="0.85"/>
+  <rect x="370" y="240" width="60" height="200" rx="6" fill="#ff642b" opacity="0.95"/>
+  <rect x="450" y="270" width="60" height="170" rx="6" fill="#ff642b" opacity="0.8"/>
+  <rect x="530" y="320" width="60" height="120" rx="6" fill="#ff642b" opacity="0.65"/>
+  <!-- trend line -->
+  <polyline points="240,360 320,300 400,240 480,268 560,318" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+  <text x="400" y="510" font-family="'Arial Black', sans-serif" font-weight="900" font-size="56" fill="#ffffff" text-anchor="middle" letter-spacing="-1">semrush</text>
+  <rect x="280" y="542" width="240" height="36" rx="18" fill="#ff642b" opacity="0.12"/>
+  <text x="400" y="566" font-family="Arial, sans-serif" font-weight="500" font-size="16" fill="#ff642b" text-anchor="middle" letter-spacing="1">SEO &amp; MARKETING</text>
+</svg>

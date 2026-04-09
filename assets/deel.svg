@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#0a192f"/>
+  <!-- globe lines -->
+  <circle cx="400" cy="310" r="160" fill="none" stroke="#00d4aa" stroke-width="1.5" opacity="0.2"/>
+  <ellipse cx="400" cy="310" rx="80" ry="160" fill="none" stroke="#00d4aa" stroke-width="1.5" opacity="0.15"/>
+  <line x1="240" y1="310" x2="560" y2="310" stroke="#00d4aa" stroke-width="1.5" opacity="0.15"/>
+  <ellipse cx="400" cy="310" rx="160" ry="60" fill="none" stroke="#00d4aa" stroke-width="1.5" opacity="0.15"/>
+  <!-- D letterform -->
+  <rect x="300" y="230" width="28" height="160" rx="8" fill="#00d4aa"/>
+  <path d="M300 230 Q460 230 460 310 Q460 390 300 390" fill="none" stroke="#00d4aa" stroke-width="28" stroke-linecap="round"/>
+  <text x="400" y="500" font-family="'Arial Black', sans-serif" font-weight="900" font-size="72" fill="#ffffff" text-anchor="middle" letter-spacing="-2">deel</text>
+  <rect x="280" y="535" width="240" height="36" rx="18" fill="#00d4aa" opacity="0.12"/>
+  <text x="400" y="559" font-family="Arial, sans-serif" font-weight="500" font-size="16" fill="#00d4aa" text-anchor="middle" letter-spacing="1">GLOBAL HR &amp; PAYROLL</text>
+</svg>

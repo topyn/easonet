@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#0d1f12"/>
+  <circle cx="400" cy="310" r="220" fill="#16a34a" opacity="0.08"/>
+  <!-- person icon -->
+  <circle cx="400" cy="240" r="56" fill="#16a34a"/>
+  <path d="M260 400 Q260 320 400 320 Q540 320 540 400 L540 420 Q400 380 260 420 Z" fill="#16a34a"/>
+  <!-- shield -->
+  <path d="M370 340 L430 340 L450 390 Q400 420 350 390 Z" fill="#ffffff" opacity="0.15"/>
+  <text x="400" y="510" font-family="'Arial Black', sans-serif" font-weight="900" font-size="64" fill="#ffffff" text-anchor="middle" letter-spacing="-2">bambee</text>
+  <rect x="280" y="545" width="240" height="36" rx="18" fill="#16a34a" opacity="0.15"/>
+  <text x="400" y="569" font-family="Arial, sans-serif" font-weight="500" font-size="16" fill="#16a34a" text-anchor="middle" letter-spacing="1">HR FOR SMALL BIZ</text>
+</svg>

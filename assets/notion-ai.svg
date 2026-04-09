@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#191919"/>
+  <!-- grid dots -->
+  <g fill="#ffffff" opacity="0.06">
+    <circle cx="200" cy="200" r="3"/><circle cx="300" cy="200" r="3"/><circle cx="400" cy="200" r="3"/><circle cx="500" cy="200" r="3"/><circle cx="600" cy="200" r="3"/>
+    <circle cx="200" cy="300" r="3"/><circle cx="300" cy="300" r="3"/><circle cx="400" cy="300" r="3"/><circle cx="500" cy="300" r="3"/><circle cx="600" cy="300" r="3"/>
+    <circle cx="200" cy="400" r="3"/><circle cx="300" cy="400" r="3"/><circle cx="400" cy="400" r="3"/><circle cx="500" cy="400" r="3"/><circle cx="600" cy="400" r="3"/>
+    <circle cx="200" cy="500" r="3"/><circle cx="300" cy="500" r="3"/><circle cx="400" cy="500" r="3"/><circle cx="500" cy="500" r="3"/><circle cx="600" cy="500" r="3"/>
+  </g>
+  <!-- N letterform -->
+  <rect x="290" y="240" width="32" height="160" rx="6" fill="#ffffff"/>
+  <rect x="478" y="240" width="32" height="160" rx="6" fill="#ffffff"/>
+  <line x1="290" y1="240" x2="510" y2="400" stroke="#ffffff" stroke-width="32" stroke-linecap="round"/>
+  <!-- AI spark -->
+  <circle cx="540" cy="230" r="18" fill="#ff4d1c"/>
+  <text x="540" y="237" font-family="Arial, sans-serif" font-weight="900" font-size="18" fill="#ffffff" text-anchor="middle">✦</text>
+  <text x="400" y="490" font-family="'Arial Black', sans-serif" font-weight="900" font-size="56" fill="#ffffff" text-anchor="middle" letter-spacing="-2">notion ai</text>
+  <rect x="290" y="530" width="220" height="36" rx="18" fill="#ffffff" opacity="0.1"/>
+  <text x="400" y="554" font-family="Arial, sans-serif" font-weight="500" font-size="16" fill="#ffffff" opacity="0.6" text-anchor="middle" letter-spacing="1">AI WORKSPACE</text>
+</svg>

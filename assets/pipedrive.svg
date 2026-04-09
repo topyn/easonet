@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
+  <rect width="800" height="800" fill="#1a0a00"/>
+  <!-- pipeline stages -->
+  <rect x="140" y="260" width="80" height="100" rx="10" fill="#ff6b35" opacity="0.9"/>
+  <rect x="250" y="280" width="80" height="80" rx="10" fill="#ff6b35" opacity="0.7"/>
+  <rect x="360" y="295" width="80" height="65" rx="10" fill="#ff6b35" opacity="0.5"/>
+  <rect x="470" y="305" width="80" height="55" rx="10" fill="#ff6b35" opacity="0.35"/>
+  <rect x="580" y="312" width="80" height="48" rx="10" fill="#ff6b35" opacity="0.2"/>
+  <!-- arrows between -->
+  <text x="230" y="318" font-family="Arial" font-size="20" fill="#ff6b35" opacity="0.6">→</text>
+  <text x="340" y="325" font-family="Arial" font-size="20" fill="#ff6b35" opacity="0.5">→</text>
+  <text x="450" y="330" font-family="Arial" font-size="20" fill="#ff6b35" opacity="0.4">→</text>
+  <text x="560" y="333" font-family="Arial" font-size="20" fill="#ff6b35" opacity="0.3">→</text>
+  <text x="400" y="490" font-family="'Arial Black', sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle" letter-spacing="-1">pipedrive</text>
+  <rect x="270" y="525" width="260" height="36" rx="18" fill="#ff6b35" opacity="0.12"/>
+  <text x="400" y="549" font-family="Arial, sans-serif" font-weight="500" font-size="16" fill="#ff6b35" text-anchor="middle" letter-spacing="1">CRM &amp; SALES</text>
+</svg>
