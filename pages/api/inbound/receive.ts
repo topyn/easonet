@@ -73,13 +73,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Create new thread if no match
     if (!thread) {
       thread = await prisma.thread.create({
-        data: {
-          subject,
-          identityId: identity.id,
-          participants: [toEmail, fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? fromAddress],
-          lastAt: new Date(),
-        },
-      })
+  data: {
+    subject,
+    identityId: identity.id,
+    userId: identity.userId,
+    participants: [toEmail, fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? fromAddress],
+    lastAt: new Date(),
+  },
+})
     } else {
       await prisma.thread.update({
         where: { id: thread.id },
