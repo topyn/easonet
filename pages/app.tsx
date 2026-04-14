@@ -36,7 +36,7 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
-  const s: Record<string, React.CSSProperties> = {
+  const s: Record<string, any> = {
     wrap: { padding: 24, display: 'flex', flexDirection: 'column', gap: 16, fontFamily: 'system-ui,sans-serif' },
     heading: { fontSize: 15, fontWeight: 600, color: '#1a1a1a' },
     sub: { fontSize: 13, color: '#666', lineHeight: 1.5 },
@@ -116,7 +116,7 @@ function UpgradeBanner({ plan, trialEndsAt, identityCount }: { plan: string; tri
 
   if (plan !== 'trial') return null
 
-  const s: Record<string, React.CSSProperties> = {
+  const s: Record<string, any> = {
     banner: { background: expired ? '#FCEBEB' : '#EEEDFE', borderBottom: `0.5px solid ${expired ? '#F09595' : '#AFA9EC'}`, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 },
     text: { flex: 1, color: expired ? '#A32D2D' : '#3C3489' },
     btn: (color: string) => ({ padding: '5px 14px', background: color, color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' as const }),
@@ -229,7 +229,7 @@ export default function App() {
   if (loading) return <div style={{ fontFamily: 'system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#888' }}>Loading…</div>
 
   // ── Styles ───────────────────────────────────────────────────────────────
-  const s: Record<string, React.CSSProperties> = {
+  const s: Record<string, any> = {
     app: { display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'system-ui,sans-serif', background: '#fff', color: '#1a1a1a', overflow: 'hidden' },
     body: { display: 'flex', flex: 1, overflow: 'hidden' },
     sidebar: { width: 220, background: '#f8f7f4', borderRight: '0.5px solid #e0ddd6', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' },
