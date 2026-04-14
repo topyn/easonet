@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+model User {
+  id                String     @id @default(cuid())
+  supabaseId        String     @unique
+  email             String     @unique
+  stripeCustomerId  String?
+  stripeSubId       String?
+  plan              String     @default("trial")  // trial | starter | growth | pro
+  trialEndsAt       DateTime?
+  createdAt         DateTime   @default(now())
+  identities        Identity[]
+  threads           Thread[]
+}
+
+model Identity {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  name         String
+  email        String    @unique
+  domain       String
+  color        String    @default("#534AB7")
+  dnsVerified  Boolean   @default(false)
+  smtpHost     String
+  smtpPort     Int       @default(587)
+  smtpUser     String
+  smtpPass     String
+  createdAt    DateTime  @default(now())
+  threads      Thread[]
+  sentMessages Message[] @relation("SentMessages")
+}
+
+model Thread {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  subject      String
+  identityId   String
+  identity     Identity  @relation(fields: [identityId], references: [id])
+  participants String[]
+  read         Boolean   @default(false)
+  lastAt       DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  messages     Message[]
+}
+
+model Message {
+  id               String    @id @default(cuid())
+  threadId         String
+  thread           Thread    @relation(fields: [threadId], references: [id])
+  direction        String    // "inbound" | "outbound"
+  fromAddress      String
+  toAddress        String
+  subject          String
+  bodyText         String    @db.Text
+  bodyHtml         String?   @db.Text
+  rawMessageId     String?
+  sentByIdentityId String?
+  sentByIdentity   Identity? @relation("SentMessages", fields: [sentByIdentityId], references: [id])
+  createdAt        DateTime  @default(now())
+}
