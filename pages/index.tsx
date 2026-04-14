@@ -35,7 +35,7 @@ export default function AuthPage() {
     }
   }
 
-  const s: Record<string, React.CSSProperties> = {
+  const s: Record<string, any> = {
     page: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f7f4', fontFamily: 'system-ui,sans-serif' },
     card: { background: '#fff', border: '0.5px solid #e0ddd6', borderRadius: 16, padding: '40px 36px', width: 360, display: 'flex', flexDirection: 'column', gap: 16 },
     logo: { fontSize: 22, fontWeight: 700, color: '#534AB7', marginBottom: 4 },
