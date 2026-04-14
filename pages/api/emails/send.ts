@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { sendFromIdentity } from '../../../lib/mailer'
+import { getUser } from '../../../lib/supabase-server'
 import { z } from 'zod'
 
 const SendSchema = z.object({
@@ -9,7 +10,7 @@ const SendSchema = z.object({
   subject: z.string().min(1),
   text: z.string().min(1),
   html: z.string().optional(),
-  threadId: z.string().optional(), // if replying to existing thread
+  threadId: z.string().optional(),
 })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -17,6 +18,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', ['POST'])
     return res.status(405).end()
   }
+
+  const authUser = await getUser(req, res)
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated' })
+
+  const dbUser = await prisma.user.findUnique({ where: { supabaseId: authUser.id } })
+  if (!dbUser) return res.status(404).json({ error: 'User not found' })
 
   const parsed = SendSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -26,7 +33,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const identity = await prisma.identity.findUnique({ where: { id: identityId } })
   if (!identity) return res.status(404).json({ error: 'Identity not found' })
 
-  // If replying, fetch last message for threading headers
   let inReplyTo: string | undefined
   let references: string | undefined
   let thread = threadId ? await prisma.thread.findUnique({
@@ -38,44 +44,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const lastMsg = thread.messages.at(-1)
     if (lastMsg?.rawMessageId) {
       inReplyTo = lastMsg.rawMessageId
-      const allIds = thread.messages
-        .map(m => m.rawMessageId)
-        .filter(Boolean)
-        .join(' ')
+      const allIds = thread.messages.map(m => m.rawMessageId).filter(Boolean).join(' ')
       references = allIds
     }
   }
 
-  // Send the email
-  const messageId = await sendFromIdentity({
-    identity,
-    to,
-    subject,
-    text,
-    html,
-    inReplyTo,
-    references,
-  })
+  const messageId = await sendFromIdentity({ identity, to, subject, text, html, inReplyTo, references })
 
-  // Upsert thread
   if (!thread) {
     thread = await prisma.thread.create({
       data: {
         subject,
         identityId,
+        userId: dbUser.id,
         participants: [identity.email, to],
         lastAt: new Date(),
       },
       include: { messages: true },
     })
   } else {
-    await prisma.thread.update({
-      where: { id: thread.id },
-      data: { lastAt: new Date() },
-    })
+    await prisma.thread.update({ where: { id: thread.id }, data: { lastAt: new Date() } })
   }
 
-  // Store the outbound message
   const message = await prisma.message.create({
     data: {
       threadId: thread.id,
