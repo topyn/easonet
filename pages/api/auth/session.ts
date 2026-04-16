@@ -1,25 +1,38 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createServerSupabase, getUser } from '../../../lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
 import { prisma } from '../../../lib/prisma'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const supabase = createServerSupabase(req, res)
-
   if (req.method === 'DELETE') {
-    await supabase.auth.signOut()
     return res.status(200).json({ ok: true })
   }
 
   if (req.method === 'GET') {
-    const user = await getUser(req, res)
-    if (!user) return res.status(401).json({ error: 'Not authenticated' })
+    try {
+      const authHeader = req.headers.authorization
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(200).json({ user: null })
+      }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { supabaseId: user.id },
-      select: { id: true, email: true, plan: true, trialEndsAt: true },
-    })
+      const token = authHeader.replace('Bearer ', '')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
 
-    return res.status(200).json({ user: dbUser })
+      const { data: { user }, error } = await supabase.auth.getUser(token)
+      if (error || !user) return res.status(200).json({ user: null })
+
+      const dbUser = await prisma.user.findUnique({
+        where: { supabaseId: user.id },
+        select: { id: true, email: true, plan: true, trialEndsAt: true },
+      })
+
+      return res.status(200).json({ user: dbUser })
+    } catch (err: any) {
+      console.error('SESSION ERROR:', err.message)
+      return res.status(200).json({ user: null })
+    }
   }
 
   res.setHeader('Allow', ['GET', 'DELETE'])

@@ -1,31 +1,28 @@
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextApiRequest, NextApiResponse } from 'next'
 
-export function createServerSupabase(req: NextApiRequest, res: NextApiResponse) {
-  return createServerClient(
+export function createServerSupabase(_req: NextApiRequest, _res: NextApiResponse) {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return Object.entries(req.cookies).map(([name, value]) => ({
-            name,
-            value: value ?? '',
-          }))
-        },
-        setAll(cookies) {
-          cookies.forEach(({ name, value, options }) => {
-            res.setHeader('Set-Cookie', `${name}=${value}; Path=/; HttpOnly; SameSite=Lax`)
-          })
-        },
-      },
-    }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
 
-// Get the current user from a request, returns null if not authed
-export async function getUser(req: NextApiRequest, res: NextApiResponse) {
-  const supabase = createServerSupabase(req, res)
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+export async function getUser(req: NextApiRequest, _res: NextApiResponse) {
+  try {
+    // Try Bearer token from Authorization header first
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: { user }, error } = await supabase.auth.getUser(token)
+      if (!error && user) return user
+    }
+    return null
+  } catch {
+    return null
+  }
 }

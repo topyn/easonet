@@ -12,67 +12,72 @@ const CreateIdentitySchema = z.object({
 })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const authUser = await getUser(req, res)
-  if (!authUser) return res.status(401).json({ error: 'Not authenticated' })
+  try {
+    const authUser = await getUser(req, res)
+    if (!authUser) return res.status(401).json({ error: 'Not authenticated' })
 
-  const dbUser = await prisma.user.findUnique({
-    where: { supabaseId: authUser.id },
-    include: { identities: true },
-  })
-  if (!dbUser) return res.status(404).json({ error: 'User not found' })
-
-  if (req.method === 'GET') {
-    const identities = await prisma.identity.findMany({
-      where: { userId: dbUser.id },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true, name: true, email: true,
-        domain: true, color: true, dnsVerified: true, createdAt: true,
-      },
+    const dbUser = await prisma.user.findUnique({
+      where: { supabaseId: authUser.id },
+      include: { identities: true },
     })
-    return res.json(identities)
-  }
+    if (!dbUser) return res.status(404).json({ error: 'User not found' })
 
-  if (req.method === 'POST') {
-    // Enforce trial domain limit
-    const isTrial = dbUser.plan === 'trial'
-    const trialExpired = dbUser.trialEndsAt && new Date() > dbUser.trialEndsAt
-    if (trialExpired) return res.status(403).json({ error: 'Trial expired', code: 'TRIAL_EXPIRED' })
-    if (isTrial && dbUser.identities.length >= TRIAL_DOMAIN_LIMIT) {
-      return res.status(403).json({ error: 'Trial limit reached', code: 'UPGRADE_REQUIRED' })
+    if (req.method === 'GET') {
+      const identities = await prisma.identity.findMany({
+        where: { userId: dbUser.id },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true, name: true, email: true,
+          domain: true, color: true, dnsVerified: true, createdAt: true,
+        },
+      })
+      return res.json(identities)
     }
 
-    const parsed = CreateIdentitySchema.safeParse(req.body)
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+    if (req.method === 'POST') {
+      const isTrial = dbUser.plan === 'trial'
+      const trialExpired = dbUser.trialEndsAt && new Date() > dbUser.trialEndsAt
+      if (trialExpired) return res.status(403).json({ error: 'Trial expired', code: 'TRIAL_EXPIRED' })
+      if (isTrial && dbUser.identities.length >= TRIAL_DOMAIN_LIMIT) {
+        return res.status(403).json({ error: 'Trial limit reached', code: 'UPGRADE_REQUIRED' })
+      }
 
-    const data = parsed.data
-    const domain = data.email.split('@')[1]
-    const smtp = brevoSmtpConfig()
+      const parsed = CreateIdentitySchema.safeParse(req.body)
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
 
-    const identity = await prisma.identity.create({
-      data: {
-        userId: dbUser.id,
-        name: data.name,
-        email: data.email,
-        domain,
-        color: data.color ?? '#534AB7',
-        smtpHost: smtp.smtpHost,
-        smtpPort: smtp.smtpPort,
-        smtpUser: smtp.smtpUser,
-        smtpPass: smtp.smtpPass,
-      },
-    })
+      const data = parsed.data
+      const domain = data.email.split('@')[1]
+      const smtp = brevoSmtpConfig()
 
-    return res.status(201).json({
-      id: identity.id,
-      name: identity.name,
-      email: identity.email,
-      domain: identity.domain,
-      color: identity.color,
-      dnsVerified: identity.dnsVerified,
-    })
+      const identity = await prisma.identity.create({
+        data: {
+          userId: dbUser.id,
+          name: data.name,
+          email: data.email,
+          domain,
+          color: data.color ?? '#534AB7',
+          smtpHost: smtp.smtpHost,
+          smtpPort: smtp.smtpPort,
+          smtpUser: smtp.smtpUser,
+          smtpPass: smtp.smtpPass,
+        },
+      })
+
+      return res.status(201).json({
+        id: identity.id,
+        name: identity.name,
+        email: identity.email,
+        domain: identity.domain,
+        color: identity.color,
+        dnsVerified: identity.dnsVerified,
+      })
+    }
+
+    res.setHeader('Allow', ['GET', 'POST'])
+    res.status(405).end()
+
+  } catch (err: any) {
+    console.error('IDENTITIES ERROR:', err.message)
+    return res.status(500).json({ error: err.message })
   }
-
-  res.setHeader('Allow', ['GET', 'POST'])
-  res.status(405).end()
 }
