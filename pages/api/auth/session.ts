@@ -30,7 +30,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(200).json({ user: dbUser })
     } catch (err: any) {
-      console.error('SESSION ERROR:', err.message)
       return res.status(200).json({ user: null })
     }
   }

@@ -10,7 +10,6 @@ export function createServerSupabase(_req: NextApiRequest, _res: NextApiResponse
 
 export async function getUser(req: NextApiRequest, _res: NextApiResponse) {
   try {
-    // Try Bearer token from Authorization header first
     const authHeader = req.headers.authorization
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '')

@@ -50,9 +50,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    console.log('Sending from:', identity.email, 'to:', to, 'subject:', subject)
-const messageId = await sendFromIdentity({ identity, to, subject, text, html, inReplyTo, references })
-console.log('Sent successfully, messageId:', messageId)
+    const messageId = await sendFromIdentity({ identity, to, subject, text, html, inReplyTo, references })
+
     if (!thread) {
       thread = await prisma.thread.create({
         data: {
