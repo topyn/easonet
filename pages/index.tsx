@@ -33,7 +33,7 @@ export default function Homepage() {
         nav {
           position: fixed; top: 0; left: 0; right: 0; z-index: 100;
           display: flex; align-items: center; justify-content: space-between;
-          padding: 0 40px; height: 60px;
+          padding: 0 80px; height: 60px;
           background: rgba(8,8,8,0.85); backdrop-filter: blur(20px);
           border-bottom: 1px solid var(--border);
         }
@@ -47,7 +47,7 @@ export default function Homepage() {
         .btn-ghost:hover { border-color: var(--border-bright); color: var(--text); }
         .btn-primary { font-size: 13px; font-weight: 500; color: #fff; padding: 8px 20px; background: var(--accent); border: none; border-radius: 6px; cursor: pointer; transition: all .2s; font-family: 'DM Sans', sans-serif; }
         .btn-primary:hover { background: var(--accent-bright); transform: translateY(-1px); }
-        .hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 120px 40px 80px; z-index: 1; }
+        .hero { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 120px 80px 80px; z-index: 1; }
         .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 1px solid rgba(123,110,246,0.3); border-radius: 100px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent-bright); background: rgba(123,110,246,0.08); margin-bottom: 40px; letter-spacing: .08em; text-transform: uppercase; }
         .hero-badge::before { content: ''; width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
@@ -70,7 +70,7 @@ export default function Homepage() {
         .logos p { font-size: 12px; color: #444; text-transform: uppercase; letter-spacing: .15em; font-family: 'DM Mono', monospace; margin-bottom: 32px; }
         .logos-row { display: flex; align-items: center; justify-content: center; gap: 48px; flex-wrap: wrap; }
         .logo-item { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: #2a2a2a; letter-spacing: -0.5px; }
-        .section { position: relative; z-index: 1; padding: 100px 40px; max-width: 1200px; margin: 0 auto; }
+        .section { position: relative; z-index: 1; padding: 100px 80px; max-width: 1400px; margin: 0 auto; width: 100%; }
         .section-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .15em; margin-bottom: 16px; }
         .section-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(30px, 4vw, 50px); letter-spacing: -2px; line-height: 1.05; margin-bottom: 20px; }
         .section-sub { font-size: 15px; color: var(--muted); max-width: 460px; margin-bottom: 60px; line-height: 1.7; }
@@ -111,22 +111,22 @@ export default function Homepage() {
         .btn-plan:hover { border-color: var(--border-bright); }
         .btn-plan.featured-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
         .btn-plan.featured-btn:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
-        footer { position: relative; z-index: 1; border-top: 1px solid var(--border); padding: 48px 40px; display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto; }
+        footer { position: relative; z-index: 1; border-top: 1px solid var(--border); padding: 48px 80px; display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; width: 100%; }
         .footer-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; letter-spacing: -0.5px; }
         .footer-logo span { color: var(--accent); }
         .footer-links { display: flex; gap: 28px; list-style: none; }
         .footer-links a { font-size: 13px; color: var(--muted); transition: color .2s; }
         .footer-links a:hover { color: var(--text); }
         .footer-copy { font-size: 12px; color: #333; font-family: 'DM Mono', monospace; }
-        @media (max-width: 900px) {
+        @media (max-width: 640px) {
           .tools-grid { grid-template-columns: 1fr; }
           .steps { grid-template-columns: repeat(2, 1fr); }
           .pricing-grid { grid-template-columns: 1fr; }
-          nav { padding: 0 20px; }
+          nav { padding: 0 24px; }
           .nav-links { display: none; }
-          .section { padding: 60px 20px; }
-          .hero { padding: 100px 20px 60px; }
-          footer { flex-direction: column; gap: 24px; text-align: center; padding: 40px 20px; }
+          .section { padding: 60px 24px; }
+          .hero { padding: 100px 24px 60px; }
+          footer { flex-direction: column; gap: 24px; text-align: center; padding: 40px 24px; }
         }
       `}</style>
 
