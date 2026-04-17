@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
+import Head from 'next/head'
 
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
 interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean }
@@ -7,7 +8,16 @@ interface Message { id: string; direction: string; fromAddress: string; toAddres
 interface Thread { id: string; subject: string; lastAt: string; read: boolean; participants: string[]; identity: Identity; messages: Message[] }
 interface DnsResult { mx: boolean; spf: boolean }
 
-const COLORS = ['#534AB7','#0F6E56','#993C1D','#185FA5','#854F0B','#993556','#3B6D11']
+const COLORS = ['#7B6EF6','#3ECF8E','#F5A623','#60A5FA','#F87171','#A78BFA','#34D399']
+
+const BG = '#080808'
+const BG2 = '#101010'
+const BG3 = '#161616'
+const BORDER = 'rgba(255,255,255,0.07)'
+const BORDER2 = 'rgba(255,255,255,0.12)'
+const TEXT = '#f0f0ee'
+const MUTED = '#666'
+const ACCENT = '#7B6EF6'
 
 function getToken() {
   try { return localStorage.getItem('easonet_token') ?? '' } catch { return '' }
@@ -28,6 +38,7 @@ function authFetch(url: string, options: RequestInit = {}) {
 function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
 
+// ── DNS Wizard ────────────────────────────────────────────────────────────
 function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: () => void }) {
   const [step, setStep] = useState<'records' | 'checking' | 'done'>('records')
   const [dns, setDns] = useState<DnsResult | null>(null)
@@ -51,60 +62,74 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
 
   const copy = (text: string) => navigator.clipboard.writeText(text)
 
-  const s: Record<string, any> = {
-    wrap: { padding: 24, display: 'flex', flexDirection: 'column', gap: 16, fontFamily: 'system-ui,sans-serif' },
-    heading: { fontSize: 15, fontWeight: 600, color: '#1a1a1a' },
-    sub: { fontSize: 13, color: '#666', lineHeight: 1.5 },
-    record: { background: '#f5f5f3', borderRadius: 8, padding: '12px 14px', fontFamily: 'monospace', fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 },
-    recordLabel: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '.05em' },
-    copyRow: { display: 'flex', alignItems: 'center', gap: 8 },
-    copyVal: { flex: 1, color: '#1a1a1a', wordBreak: 'break-all' },
-    copyBtn: { fontSize: 11, padding: '3px 8px', border: '0.5px solid #ccc', borderRadius: 5, cursor: 'pointer', background: '#fff', whiteSpace: 'nowrap' },
-    checkRow: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 },
-    tick: (ok: boolean | null) => ({ width: 18, height: 18, borderRadius: '50%', background: ok === null ? '#e0ddd6' : ok ? '#E1F5EE' : '#FCEBEB', color: ok ? '#0F6E56' : '#E24B4A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }),
-    btn: { padding: '10px 20px', background: '#534AB7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' },
-    successBox: { background: '#E1F5EE', color: '#0F6E56', padding: '14px 16px', borderRadius: 8, fontSize: 14, fontWeight: 500 },
-  }
+  if (step === 'done') return (
+    <div style={{ padding: 32 }}>
+      <div style={{ background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.2)', borderRadius: 10, padding: '20px 24px', color: '#3ECF8E', fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+        ✓ DNS verified — {identity.email} is live
+      </div>
+    </div>
+  )
 
-  if (step === 'done') return <div style={s.wrap}><div style={s.successBox}>DNS verified — {identity.email} is ready to use</div></div>
+  const recordBox = (label: string, fields: {k: string, v: string}[], extra?: string) => (
+    <div style={{ background: BG3, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '20px 24px', marginBottom: 12 }}>
+      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT, textTransform: 'uppercase' as const, letterSpacing: '.1em', marginBottom: 14 }}>{label}</div>
+      {fields.map(f => (
+        <div key={f.k} style={{ marginBottom: 10 }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#444', marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '.05em' }}>{f.k}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: TEXT, flex: 1, wordBreak: 'break-all' as const }}>{f.v}</span>
+            <button onClick={() => copy(f.v)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, padding: '3px 10px', border: `1px solid ${BORDER2}`, borderRadius: 5, cursor: 'pointer', background: 'transparent', color: MUTED, whiteSpace: 'nowrap' as const, flexShrink: 0 }}>copy</button>
+          </div>
+        </div>
+      ))}
+      {extra && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#444', marginTop: 4 }}>{extra}</div>}
+    </div>
+  )
 
   return (
-    <div style={s.wrap}>
-      <div style={s.heading}>Set up {identity.domain}</div>
-      <div style={s.sub}>Add these two records in your DNS provider, then click Check.</div>
-      <div style={s.record}>
-        <div style={s.recordLabel}>MX record</div>
-        <div style={{ ...s.recordLabel, marginTop: 4 }}>Name</div>
-        <div style={s.copyRow}><span style={s.copyVal}>{identity.domain}</span><button style={s.copyBtn} onClick={() => copy(identity.domain)}>Copy</button></div>
-        <div style={{ ...s.recordLabel, marginTop: 4 }}>Value</div>
-        <div style={s.copyRow}><span style={s.copyVal}>route1.mx.cloudflare.net</span><button style={s.copyBtn} onClick={() => copy('route1.mx.cloudflare.net')}>Copy</button></div>
-        <div style={{ ...s.recordLabel, marginTop: 4 }}>Priority: 13</div>
-      </div>
-      <div style={s.record}>
-        <div style={s.recordLabel}>TXT record (SPF)</div>
-        <div style={{ ...s.recordLabel, marginTop: 4 }}>Name</div>
-        <div style={s.copyRow}><span style={s.copyVal}>{identity.domain}</span><button style={s.copyBtn} onClick={() => copy(identity.domain)}>Copy</button></div>
-        <div style={{ ...s.recordLabel, marginTop: 4 }}>Value</div>
-        <div style={s.copyRow}><span style={s.copyVal}>v=spf1 include:_spf.brevo.com ~all</span><button style={s.copyBtn} onClick={() => copy('v=spf1 include:_spf.brevo.com ~all')}>Copy</button></div>
-      </div>
+    <div style={{ padding: 32, maxWidth: 600 }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: TEXT, letterSpacing: -0.5, marginBottom: 8 }}>Set up {identity.domain}</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 28, lineHeight: 1.6 }}>Add these two DNS records, then click check. Usually propagates in under 10 minutes.</div>
+
+      {recordBox('MX record — inbound routing', [
+        { k: 'Name', v: identity.domain },
+        { k: 'Value', v: 'route1.mx.cloudflare.net' },
+      ], 'Priority: 13')}
+
+      {recordBox('TXT record — SPF', [
+        { k: 'Name', v: identity.domain },
+        { k: 'Value', v: 'v=spf1 include:_spf.brevo.com ~all' },
+      ])}
+
       {step === 'checking' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={s.checkRow}><div style={s.tick(dns?.mx ?? null)}>{dns?.mx ? '✓' : dns ? '✗' : '…'}</div><span>MX record {dns?.mx ? 'found' : 'checking…'}</span></div>
-          <div style={s.checkRow}><div style={s.tick(dns?.spf ?? null)}>{dns?.spf ? '✓' : dns ? '✗' : '…'}</div><span>SPF record {dns?.spf ? 'found' : 'checking…'}</span></div>
-          <div style={{ fontSize: 12, color: '#aaa' }}>Checking every 4 seconds</div>
+        <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[{ label: 'MX record', ok: dns?.mx }, { label: 'SPF record', ok: dns?.spf }].map(r => (
+            <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', background: r.ok === undefined ? '#222' : r.ok ? 'rgba(62,207,142,0.15)' : 'rgba(255,107,107,0.15)', border: `1px solid ${r.ok === undefined ? '#333' : r.ok ? 'rgba(62,207,142,0.4)' : 'rgba(255,107,107,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: r.ok ? '#3ECF8E' : '#ff6b6b', flexShrink: 0 }}>
+                {r.ok === undefined ? '' : r.ok ? '✓' : '✗'}
+              </div>
+              <span style={{ color: r.ok ? '#3ECF8E' : MUTED }}>{r.label} {r.ok ? 'verified' : 'checking…'}</span>
+            </div>
+          ))}
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', marginTop: 4 }}>// polling every 4 seconds</div>
         </div>
       )}
-      <button style={s.btn} onClick={startChecking} disabled={step === 'checking'}>
-        {step === 'checking' ? 'Checking…' : "I've added the records — check now"}
+
+      <button
+        onClick={startChecking}
+        disabled={step === 'checking'}
+        style={{ padding: '10px 24px', background: step === 'checking' ? '#1a1a1a' : ACCENT, color: step === 'checking' ? MUTED : '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: step === 'checking' ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+      >
+        {step === 'checking' ? 'Checking…' : "I've added the records — verify now"}
       </button>
     </div>
   )
 }
 
-function UpgradeBanner({ plan, trialEndsAt, identityCount }: { plan: string; trialEndsAt: string | null; identityCount: number }) {
+// ── Trial Banner ───────────────────────────────────────────────────────────
+function TrialBanner({ plan, trialEndsAt, identityCount }: { plan: string; trialEndsAt: string | null; identityCount: number }) {
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0
   const expired = daysLeft === 0 && plan === 'trial'
-  const atLimit = plan === 'trial' && identityCount >= 3
 
   async function upgrade(p: string) {
     const res = await post('/api/billing/checkout', { plan: p })
@@ -114,24 +139,21 @@ function UpgradeBanner({ plan, trialEndsAt, identityCount }: { plan: string; tri
 
   if (plan !== 'trial') return null
 
-  const s: Record<string, any> = {
-    banner: { background: expired ? '#FCEBEB' : '#EEEDFE', borderBottom: `0.5px solid ${expired ? '#F09595' : '#AFA9EC'}`, padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 },
-    text: { flex: 1, color: expired ? '#A32D2D' : '#3C3489' },
-    btn: (color: string) => ({ padding: '5px 14px', background: color, color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }),
-  }
-
   return (
-    <div style={s.banner}>
-      <span style={s.text}>
-        {expired ? 'Trial expired — upgrade to keep sending' : atLimit ? `Trial: ${daysLeft}d left — at 3-domain limit` : `Trial: ${daysLeft} days left · ${3 - identityCount} domain${3 - identityCount !== 1 ? 's' : ''} remaining`}
+    <div style={{ background: expired ? 'rgba(255,107,107,0.06)' : 'rgba(123,110,246,0.06)', borderBottom: `1px solid ${expired ? 'rgba(255,107,107,0.15)' : 'rgba(123,110,246,0.15)'}`, padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
+      <span style={{ flex: 1, color: expired ? '#ff6b6b' : '#7B6EF6' }}>
+        {expired ? '// trial expired — upgrade to continue' : `// trial: ${daysLeft}d remaining · ${Math.max(0, 3 - identityCount)} domain${3 - identityCount !== 1 ? 's' : ''} left`}
       </span>
-      <button style={s.btn('#534AB7')} onClick={() => upgrade('starter')}>Starter $9.99</button>
-      <button style={s.btn('#0F6E56')} onClick={() => upgrade('growth')}>Growth $19.99</button>
-      <button style={s.btn('#185FA5')} onClick={() => upgrade('pro')}>Pro $34.99</button>
+      {['starter', 'growth', 'pro'].map((p, i) => (
+        <button key={p} onClick={() => upgrade(p)} style={{ padding: '4px 12px', background: 'transparent', border: `1px solid ${BORDER2}`, borderRadius: 5, fontSize: 11, color: MUTED, cursor: 'pointer', fontFamily: "'DM Mono', monospace" }}>
+          {['$9.99', '$19.99', '$34.99'][i]}
+        </button>
+      ))}
     </div>
   )
 }
 
+// ── Main App ───────────────────────────────────────────────────────────────
 export default function App() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -156,13 +178,10 @@ export default function App() {
     try {
       const token = localStorage.getItem('easonet_token')
       const userStr = localStorage.getItem('easonet_user')
-      if (!token || !userStr) { router.replace('/'); return }
-      const savedUser = JSON.parse(userStr)
-      setUser(savedUser)
+      if (!token || !userStr) { router.replace('/login'); return }
+      setUser(JSON.parse(userStr))
       setLoading(false)
-    } catch {
-      router.replace('/')
-    }
+    } catch { router.replace('/login') }
   }, [])
 
   const loadIdentities = useCallback(async () => {
@@ -211,257 +230,317 @@ export default function App() {
   async function logout() {
     localStorage.removeItem('easonet_token')
     localStorage.removeItem('easonet_user')
-    router.replace('/')
+    router.replace('/login')
   }
 
-  if (loading) return <div style={{ fontFamily: 'system-ui', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#888' }}>Loading…</div>
-
-  const s: Record<string, any> = {
-    app: { display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'system-ui,sans-serif', background: '#fff', color: '#1a1a1a', overflow: 'hidden' },
-    body: { display: 'flex', flex: 1, overflow: 'hidden' },
-    sidebar: { width: 220, background: '#f8f7f4', borderRight: '0.5px solid #e0ddd6', display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden' },
-    sidebarScroll: { flex: 1, overflowY: 'auto', padding: '12px 0' },
-    sidebarSection: { padding: '0 12px', marginBottom: 16 },
-    sidebarLabel: { fontSize: 11, color: '#aaa', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6, padding: '0 4px' },
-    identityRow: (active: boolean, color: string) => ({ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, cursor: 'pointer', background: active ? color + '18' : 'transparent', marginBottom: 2 }),
-    dot: (color: string) => ({ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }),
-    iName: { fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#1a1a1a' },
-    iEmail: { fontSize: 11, color: '#999', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-    unverifiedDot: { width: 6, height: 6, borderRadius: '50%', background: '#EF9F27', marginLeft: 'auto', flexShrink: 0 },
-    sidebarBottom: { padding: '12px', borderTop: '0.5px solid #e0ddd6' },
-    addBtn: { width: '100%', textAlign: 'left', padding: '7px 8px', fontSize: 12, color: '#888', border: 'none', background: 'none', cursor: 'pointer', borderRadius: 8 },
-    userRow: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#888' },
-    logoutBtn: { marginLeft: 'auto', fontSize: 11, color: '#aaa', border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px' },
-    main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' },
-    toolbar: { display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: '0.5px solid #e0ddd6', gap: 10, flexShrink: 0 },
-    toolbarTitle: { flex: 1, fontSize: 15, fontWeight: 600 },
-    composeBtn: { padding: '7px 18px', background: '#534AB7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-    refreshBtn: { padding: '7px 12px', border: '0.5px solid #e0ddd6', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent', color: '#666' },
-    threadList: { flex: 1, overflowY: 'auto' },
-    thread: (unread: boolean) => ({ display: 'flex', gap: 12, padding: '13px 20px', borderBottom: '0.5px solid #f0ede6', cursor: 'pointer', background: unread ? '#faf9f7' : 'transparent', alignItems: 'flex-start' }),
-    avatar: (color: string) => ({ width: 36, height: 36, borderRadius: '50%', background: color + '22', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, flexShrink: 0 }),
-    threadBody: { flex: 1, minWidth: 0 },
-    threadRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-    threadFrom: (unread: boolean) => ({ fontSize: 13, fontWeight: unread ? 600 : 400, color: '#1a1a1a' }),
-    threadTime: { fontSize: 11, color: '#bbb', whiteSpace: 'nowrap' },
-    threadSubject: (unread: boolean) => ({ fontSize: 13, fontWeight: unread ? 500 : 400, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }),
-    threadPreview: { fontSize: 12, color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 },
-    pill: (color: string) => ({ display: 'inline-block', fontSize: 10, padding: '1px 7px', borderRadius: 10, background: color + '18', color, marginLeft: 6 }),
-    empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 14, flexDirection: 'column', gap: 8 },
-    threadDetail: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-    detailHeader: { padding: '14px 20px', borderBottom: '0.5px solid #e0ddd6', display: 'flex', alignItems: 'center', gap: 10 },
-    backBtn: { fontSize: 13, color: '#534AB7', border: 'none', background: 'none', cursor: 'pointer', padding: 0 },
-    detailSubject: { fontSize: 15, fontWeight: 600, flex: 1 },
-    messages: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 },
-    msgWrap: (out: boolean) => ({ display: 'flex', flexDirection: 'column', alignItems: out ? 'flex-end' : 'flex-start' }),
-    msgMeta: { fontSize: 11, color: '#bbb', marginBottom: 4 },
-    msgBubble: (out: boolean) => ({ maxWidth: '72%', background: out ? '#534AB7' : '#f5f5f3', color: out ? '#fff' : '#1a1a1a', padding: '10px 14px', borderRadius: out ? '14px 14px 4px 14px' : '14px 14px 14px 4px', fontSize: 14, lineHeight: 1.55, whiteSpace: 'pre-wrap' }),
-    composePanel: { position: 'absolute', bottom: 0, right: 0, width: 480, background: '#fff', border: '0.5px solid #ccc', borderRadius: '12px 12px 0 0', display: 'flex', flexDirection: 'column', boxShadow: '0 -4px 20px rgba(0,0,0,.08)', zIndex: 10 },
-    composeHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 16px', borderBottom: '0.5px solid #e0ddd6', background: '#f8f7f4', borderRadius: '12px 12px 0 0' },
-    composeTitle: { fontSize: 13, fontWeight: 600 },
-    composeClose: { fontSize: 16, color: '#999', border: 'none', background: 'none', cursor: 'pointer' },
-    composeField: { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderBottom: '0.5px solid #f0ede6' },
-    fieldLabel: { fontSize: 12, color: '#aaa', width: 36, flexShrink: 0 },
-    fieldInput: { flex: 1, border: 'none', outline: 'none', fontSize: 13, background: 'transparent', color: '#1a1a1a' },
-    fromSelect: { flex: 1, border: 'none', outline: 'none', fontSize: 13, background: 'transparent', cursor: 'pointer', color: '#1a1a1a' },
-    composeBody: { padding: '12px 16px', flex: 1 },
-    bodyInput: { width: '100%', border: 'none', outline: 'none', fontSize: 13, resize: 'none', minHeight: 120, background: 'transparent', color: '#1a1a1a', fontFamily: 'system-ui,sans-serif' },
-    composeFoot: { display: 'flex', gap: 8, padding: '10px 16px', borderTop: '0.5px solid #e0ddd6' },
-    sendBtn: { padding: '7px 18px', background: '#534AB7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-    discardBtn: { padding: '7px 14px', border: '0.5px solid #e0ddd6', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent' },
-    modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 },
-    modalBox: { background: '#fff', borderRadius: 14, padding: 28, width: 400, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '90vh', overflowY: 'auto' },
-    modalTitle: { fontSize: 16, fontWeight: 600 },
-    input: { border: '0.5px solid #d0cdc6', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box' },
-    colorRow: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-    colorSwatch: (color: string, selected: boolean) => ({ width: 26, height: 26, borderRadius: '50%', background: color, cursor: 'pointer', border: selected ? '2px solid #1a1a1a' : '2px solid transparent', boxSizing: 'border-box' }),
-    modalBtn: { padding: '9px 20px', background: '#534AB7', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-    cancelBtn: { padding: '9px 16px', border: '0.5px solid #e0ddd6', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent' },
-  }
+  if (loading) return (
+    <div style={{ background: BG, height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#333' }}>
+      // loading…
+    </div>
+  )
 
   const visibleThreads = activeIdentityId ? threads.filter(t => t.identity?.id === activeIdentityId) : threads
   const unreadCount = threads.filter(t => !t.read).length
 
+  // Shared input style
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 14px',
+    background: BG,
+    border: `1px solid ${BORDER}`,
+    borderRadius: 8,
+    fontSize: 13,
+    color: TEXT,
+    outline: 'none',
+    fontFamily: "'DM Sans', sans-serif",
+    boxSizing: 'border-box',
+  }
+
   return (
-    <div style={s.app}>
-      {user && <UpgradeBanner plan={user.plan} trialEndsAt={user.trialEndsAt} identityCount={identities.length} />}
-      <div style={s.body}>
-        <div style={s.sidebar}>
-          <div style={s.sidebarScroll}>
-            <div style={s.sidebarSection}>
-              <div style={s.sidebarLabel}>Identities</div>
-              <div style={s.identityRow(!activeIdentityId, '#888')} onClick={() => { setActiveIdentityId(null); setActiveThread(null) }}>
-                <div style={s.dot('#888')} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={s.iName}>All inboxes</div>
-                  {unreadCount > 0 && <div style={s.iEmail}>{unreadCount} unread</div>}
-                </div>
+    <>
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+      </Head>
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: ${BG}; color: ${TEXT}; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
+        select option { background: ${BG2}; color: ${TEXT}; }
+      `}</style>
+
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'DM Sans', sans-serif", background: BG, color: TEXT, overflow: 'hidden' }}>
+
+        {/* Trial banner */}
+        {user && <TrialBanner plan={user.plan} trialEndsAt={user.trialEndsAt} identityCount={identities.length} />}
+
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+          {/* Sidebar */}
+          <div style={{ width: 220, background: BG2, borderRight: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            {/* Logo */}
+            <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 17, letterSpacing: -0.5, color: TEXT }}>
+                ease<span style={{ color: ACCENT }}>.</span>net
               </div>
-              {identities.map(id => (
-                <div key={id.id} style={s.identityRow(activeIdentityId === id.id, id.color)} onClick={() => { setActiveIdentityId(id.id); setActiveThread(null) }}>
-                  <div style={s.dot(id.color)} />
+            </div>
+
+            {/* Identities */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
+              <div style={{ padding: '0 16px', marginBottom: 10 }}>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>// identities</div>
+
+                {/* All inboxes */}
+                <div
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                >
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444', flexShrink: 0 }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={s.iName}>{id.name}</div>
-                    <div style={s.iEmail}>{id.email}</div>
+                    <div style={{ fontSize: 12, color: !activeIdentityId ? TEXT : MUTED, fontWeight: !activeIdentityId ? 500 : 400 }}>All inboxes</div>
+                    {unreadCount > 0 && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT }}>{unreadCount} unread</div>}
                   </div>
-                  {!id.dnsVerified && <div title="DNS not verified" style={s.unverifiedDot} onClick={e => { e.stopPropagation(); setWizardIdentity(id) }} />}
                 </div>
-              ))}
-              <button style={s.addBtn} onClick={() => setAddingIdentity(true)}>+ Add identity</button>
-            </div>
-          </div>
-          <div style={s.sidebarBottom}>
-            <div style={s.userRow}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</span>
-              <button style={s.logoutBtn} onClick={logout}>Sign out</button>
-            </div>
-          </div>
-        </div>
 
-        <div style={s.main}>
-          {wizardIdentity && (
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              <div style={s.toolbar}>
-                <button style={s.backBtn} onClick={() => setWizardIdentity(null)}>← Back</button>
-                <span style={s.toolbarTitle}>Set up {wizardIdentity.domain}</span>
-              </div>
-              <DnsWizard identity={wizardIdentity} onVerified={async () => { setWizardIdentity(null); await loadIdentities() }} />
-            </div>
-          )}
-
-          {!wizardIdentity && (
-            <>
-              <div style={s.toolbar}>
-                <span style={s.toolbarTitle}>{activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}</span>
-                <button style={s.refreshBtn} onClick={loadThreads} title="Refresh">↻</button>
-                <button style={s.composeBtn} onClick={() => setComposing(true)}>Compose</button>
-              </div>
-
-              {activeThread ? (
-                <div style={s.threadDetail}>
-                  <div style={s.detailHeader}>
-                    <button style={s.backBtn} onClick={() => setActiveThread(null)}>← Back</button>
-                    <span style={s.detailSubject}>{activeThread.subject}</span>
-                    <span style={s.pill(activeThread.identity?.color ?? '#888')}>{activeThread.identity?.name}</span>
+                {identities.map(id => (
+                  <div
+                    key={id.id}
+                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: id.color, flexShrink: 0 }} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12, color: TEXT, fontWeight: activeIdentityId === id.id ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{id.name}</div>
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{id.email}</div>
+                    </div>
+                    {!id.dnsVerified && (
+                      <div
+                        title="DNS not verified"
+                        onClick={e => { e.stopPropagation(); setWizardIdentity(id) }}
+                        style={{ width: 5, height: 5, borderRadius: '50%', background: '#F5A623', flexShrink: 0 }}
+                      />
+                    )}
                   </div>
-                  <div style={s.messages}>
-                    {(activeThread.messages ?? []).map(m => (
-                      <div key={m.id} style={s.msgWrap(m.direction === 'outbound')}>
-                        <div style={s.msgMeta}>{m.direction === 'outbound' ? `You (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}</div>
-                        <div style={s.msgBubble(m.direction === 'outbound')}>{m.bodyText}</div>
+                ))}
+
+                <button
+                  onClick={() => setAddingIdentity(true)}
+                  style={{ width: '100%', textAlign: 'left', padding: '7px 10px', fontSize: 11, color: '#333', border: 'none', background: 'none', cursor: 'pointer', fontFamily: "'DM Mono', monospace", letterSpacing: '.03em' }}
+                >
+                  + add identity
+                </button>
+              </div>
+            </div>
+
+            {/* User row */}
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${BORDER}` }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 6 }}>{user?.email}</div>
+              <button onClick={logout} style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>// sign out</button>
+            </div>
+          </div>
+
+          {/* Main */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+
+            {/* DNS Wizard */}
+            {wizardIdentity && (
+              <div style={{ flex: 1, overflowY: 'auto', background: BG }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px', borderBottom: `1px solid ${BORDER}` }}>
+                  <button onClick={() => setWizardIdentity(null)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: ACCENT, border: 'none', background: 'none', cursor: 'pointer' }}>← back</button>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>// dns setup</div>
+                </div>
+                <DnsWizard identity={wizardIdentity} onVerified={async () => { setWizardIdentity(null); await loadIdentities() }} />
+              </div>
+            )}
+
+            {!wizardIdentity && (
+              <>
+                {/* Toolbar */}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, gap: 10, flexShrink: 0 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: -0.5, color: TEXT }}>
+                      {activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
+                    </div>
+                  </div>
+                  <button onClick={loadThreads} style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>↻</button>
+                  <button onClick={() => setComposing(true)} style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
+                </div>
+
+                {/* Thread detail */}
+                {activeThread ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button onClick={() => setActiveThread(null)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: ACCENT, border: 'none', background: 'none', cursor: 'pointer' }}>← back</button>
+                      <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: -0.3, flex: 1 }}>{activeThread.subject}</span>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: activeThread.identity?.color, padding: '3px 10px', border: `1px solid ${activeThread.identity?.color}33`, borderRadius: 100 }}>{activeThread.identity?.name}</span>
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {(activeThread.messages ?? []).map(m => (
+                        <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', marginBottom: 6 }}>
+                            {m.direction === 'outbound' ? `you (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}
+                          </div>
+                          <div style={{ maxWidth: '70%', background: m.direction === 'outbound' ? ACCENT : BG3, color: TEXT, padding: '12px 16px', borderRadius: m.direction === 'outbound' ? '12px 12px 4px 12px' : '12px 12px 12px 4px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', border: m.direction === 'outbound' ? 'none' : `1px solid ${BORDER}` }}>
+                            {m.bodyText}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ padding: '16px 24px', borderTop: `1px solid ${BORDER}`, display: 'flex', gap: 10 }}>
+                      <textarea
+                        id="quick-reply"
+                        placeholder="// quick reply…"
+                        style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', fontSize: 13, color: TEXT, resize: 'none', outline: 'none', height: 64, fontFamily: "'DM Sans', sans-serif" }}
+                      />
+                      <button
+                        onClick={async () => {
+                          const el = document.getElementById('quick-reply') as HTMLTextAreaElement
+                          if (!el?.value) return
+                          await post('/api/emails/send', {
+                            identityId: activeThread.identity.id,
+                            to: activeThread.participants.find(p => p !== activeThread.identity.email) ?? activeThread.participants[0],
+                            subject: `Re: ${activeThread.subject}`,
+                            text: el.value,
+                            threadId: activeThread.id,
+                          })
+                          el.value = ''
+                          openThread(activeThread)
+                        }}
+                        style={{ padding: '10px 20px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', alignSelf: 'flex-end', fontFamily: "'DM Sans', sans-serif" }}
+                      >Send</button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Thread list */
+                  <div style={{ flex: 1, overflowY: 'auto' }}>
+                    {visibleThreads.length === 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#333' }}>
+                          {identities.length === 0 ? '// add your first identity to get started' : '// no emails yet'}
+                        </div>
+                        {identities.length === 0 && (
+                          <button onClick={() => setAddingIdentity(true)} style={{ padding: '8px 20px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                            Add identity →
+                          </button>
+                        )}
+                      </div>
+                    ) : visibleThreads.map(t => {
+                      const lastMsg = t.messages?.[0]
+                      const isUnread = !t.read
+                      const otherParty = lastMsg?.direction === 'inbound' ? lastMsg.fromAddress.replace(/<.*>/, '').trim() : (t.participants?.find(p => p !== t.identity?.email) ?? 'You')
+                      const initials = otherParty.slice(0, 2).toUpperCase()
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => openThread(t)}
+                          style={{ display: 'flex', gap: 14, padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isUnread ? 'rgba(255,255,255,0.015)' : 'transparent', alignItems: 'flex-start' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = isUnread ? 'rgba(255,255,255,0.015)' : 'transparent')}
+                        >
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: (t.identity?.color ?? ACCENT) + '18', color: t.identity?.color ?? ACCENT, border: `1px solid ${(t.identity?.color ?? ACCENT)}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0, fontFamily: "'DM Mono', monospace" }}>
+                            {initials}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: 13, fontWeight: isUnread ? 500 : 400, color: isUnread ? TEXT : MUTED }}>
+                                {otherParty}
+                                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: t.identity?.color, padding: '2px 8px', border: `1px solid ${(t.identity?.color ?? ACCENT)}30`, borderRadius: 100, marginLeft: 8 }}>{t.identity?.name}</span>
+                              </span>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap' }}>{new Date(t.lastAt).toLocaleDateString()}</span>
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: isUnread ? 500 : 400, color: isUnread ? TEXT : MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 2 }}>{t.subject}</div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lastMsg?.bodyText?.slice(0, 80) ?? ''}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Compose panel */}
+                {composing && (
+                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: 500, background: BG2, border: `1px solid ${BORDER2}`, borderRadius: '12px 12px 0 0', display: 'flex', flexDirection: 'column', zIndex: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: `1px solid ${BORDER}`, background: BG3, borderRadius: '12px 12px 0 0' }}>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>// new message</span>
+                      <button onClick={() => setComposing(false)} style={{ fontSize: 14, color: MUTED, border: 'none', background: 'none', cursor: 'pointer' }}>✕</button>
+                    </div>
+                    {[
+                      { label: 'from', content: (
+                        <select value={composeIdentityId} onChange={e => setComposeIdentityId(e.target.value)} style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13, background: 'transparent', cursor: 'pointer', color: TEXT, fontFamily: "'DM Sans', sans-serif" }}>
+                          {identities.map(id => <option key={id.id} value={id.id}>{id.email}</option>)}
+                        </select>
+                      )},
+                      { label: 'to', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="recipient@example.com" value={composeTo} onChange={e => setComposeTo(e.target.value)} /> },
+                      { label: 'subj', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} /> },
+                    ].map(f => (
+                      <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: `1px solid ${BORDER}` }}>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', width: 30, flexShrink: 0 }}>{f.label}</span>
+                        {f.content}
                       </div>
                     ))}
-                  </div>
-                  <div style={{ padding: '12px 20px', borderTop: '0.5px solid #e0ddd6', display: 'flex', gap: 8 }}>
-                    <textarea style={{ flex: 1, border: '0.5px solid #e0ddd6', borderRadius: 8, padding: '8px 12px', fontSize: 13, resize: 'none', outline: 'none', height: 60, fontFamily: 'system-ui' }} placeholder="Quick reply…" id="quick-reply" />
-                    <button style={s.sendBtn} onClick={async () => {
-                      const el = document.getElementById('quick-reply') as HTMLTextAreaElement
-                      if (!el?.value) return
-                      await post('/api/emails/send', {
-                        identityId: activeThread.identity.id,
-                        to: activeThread.participants.find(p => p !== activeThread.identity.email) ?? activeThread.participants[0],
-                        subject: `Re: ${activeThread.subject}`,
-                        text: el.value,
-                        threadId: activeThread.id,
-                      })
-                      el.value = ''
-                      openThread(activeThread)
-                    }}>Send</button>
-                  </div>
-                </div>
-              ) : (
-                <div style={s.threadList}>
-                  {visibleThreads.length === 0 ? (
-                    <div style={s.empty}>
-                      <span>{identities.length === 0 ? 'Add your first identity to get started' : 'No emails yet'}</span>
-                      {identities.length === 0 && <button style={s.sendBtn} onClick={() => setAddingIdentity(true)}>Add identity</button>}
+                    <div style={{ padding: '12px 18px', flex: 1 }}>
+                      <textarea
+                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 13, resize: 'none', minHeight: 120, color: TEXT, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6 }}
+                        placeholder="Write your message…"
+                        value={composeText}
+                        onChange={e => setComposeText(e.target.value)}
+                      />
                     </div>
-                  ) : visibleThreads.map(t => {
-                    const lastMsg = t.messages?.[0]
-                    const isUnread = !t.read
-                    const otherParty = lastMsg?.direction === 'inbound' ? lastMsg.fromAddress.replace(/<.*>/, '').trim() : (t.participants?.find(p => p !== t.identity?.email) ?? 'You')
-                    const initials = otherParty.slice(0, 2).toUpperCase()
-                    return (
-                      <div key={t.id} style={s.thread(isUnread)} onClick={() => openThread(t)}>
-                        <div style={s.avatar(t.identity?.color ?? '#888')}>{initials}</div>
-                        <div style={s.threadBody}>
-                          <div style={s.threadRow}>
-                            <span style={s.threadFrom(isUnread)}>{otherParty}<span style={s.pill(t.identity?.color ?? '#888')}>{t.identity?.name}</span></span>
-                            <span style={s.threadTime}>{new Date(t.lastAt).toLocaleDateString()}</span>
-                          </div>
-                          <div style={s.threadSubject(isUnread)}>{t.subject}</div>
-                          <div style={s.threadPreview}>{lastMsg?.bodyText?.slice(0, 90) ?? ''}</div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {composing && (
-                <div style={s.composePanel}>
-                  <div style={s.composeHeader}>
-                    <span style={s.composeTitle}>New message</span>
-                    <button style={s.composeClose} onClick={() => setComposing(false)}>✕</button>
+                    <div style={{ display: 'flex', gap: 8, padding: '12px 18px', borderTop: `1px solid ${BORDER}` }}>
+                      <button onClick={sendEmail} disabled={composeSending} style={{ padding: '8px 20px', background: composeSending ? '#333' : ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: composeSending ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                        {composeSending ? 'Sending…' : 'Send →'}
+                      </button>
+                      <button onClick={() => setComposing(false)} style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
+                    </div>
                   </div>
-                  <div style={s.composeField}>
-                    <span style={s.fieldLabel}>From</span>
-                    <select style={s.fromSelect} value={composeIdentityId} onChange={e => setComposeIdentityId(e.target.value)}>
-                      {identities.map(id => <option key={id.id} value={id.id}>{id.email}</option>)}
-                    </select>
-                  </div>
-                  <div style={s.composeField}>
-                    <span style={s.fieldLabel}>To</span>
-                    <input style={s.fieldInput} placeholder="recipient@example.com" value={composeTo} onChange={e => setComposeTo(e.target.value)} />
-                  </div>
-                  <div style={s.composeField}>
-                    <span style={s.fieldLabel}>Subj</span>
-                    <input style={s.fieldInput} placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} />
-                  </div>
-                  <div style={s.composeBody}>
-                    <textarea style={s.bodyInput} placeholder="Write your message…" value={composeText} onChange={e => setComposeText(e.target.value)} />
-                  </div>
-                  <div style={s.composeFoot}>
-                    <button style={s.sendBtn} onClick={sendEmail} disabled={composeSending}>{composeSending ? 'Sending…' : 'Send'}</button>
-                    <button style={s.discardBtn} onClick={() => setComposing(false)}>Discard</button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Add identity modal */}
       {addingIdentity && (
-        <div style={s.modal} onClick={e => e.target === e.currentTarget && setAddingIdentity(false)}>
-          <div style={s.modalBox}>
-            <div style={s.modalTitle}>Add identity</div>
+        <div onClick={e => e.target === e.currentTarget && setAddingIdentity(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
+          <div style={{ background: BG2, border: `1px solid ${BORDER2}`, borderRadius: 14, padding: 32, width: 420, display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
-              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>Display name</label>
-              <input style={s.input} placeholder="e.g. Survival Storehouse" value={newName} onChange={e => setNewName(e.target.value)} />
+              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, letterSpacing: -0.5, color: TEXT, marginBottom: 6 }}>Add identity</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333' }}>// new domain email address</div>
             </div>
+            {[
+              { label: 'display name', placeholder: 'e.g. Topyn', value: newName, set: setNewName },
+              { label: 'email address', placeholder: 'mark@topyn.com', value: newEmail, set: setNewEmail },
+            ].map(f => (
+              <div key={f.label}>
+                <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#444', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>{f.label}</label>
+                <input style={inputStyle} placeholder={f.placeholder} value={f.value} onChange={e => f.set(e.target.value)} />
+              </div>
+            ))}
             <div>
-              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>Email address</label>
-              <input style={s.input} placeholder="mark@yourdomain.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Colour</label>
-              <div style={s.colorRow}>
-                {COLORS.map(c => <div key={c} style={s.colorSwatch(c, newColor === c)} onClick={() => setNewColor(c)} />)}
+              <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#444', display: 'block', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.08em' }}>colour</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {COLORS.map(c => (
+                  <div key={c} onClick={() => setNewColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: newColor === c ? `2px solid ${TEXT}` : '2px solid transparent', boxSizing: 'border-box' }} />
+                ))}
               </div>
             </div>
             {user?.plan === 'trial' && identities.length >= 3 && (
-              <div style={{ fontSize: 13, color: '#993C1D', background: '#FAECE7', padding: '10px 12px', borderRadius: 8 }}>
-                You've reached the 3-domain trial limit. Upgrade to add more.
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#F5A623', background: 'rgba(245,166,35,0.08)', border: '1px solid rgba(245,166,35,0.2)', padding: '10px 14px', borderRadius: 8 }}>
+                // trial limit reached — upgrade to add more
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={s.modalBtn} onClick={addIdentity} disabled={user?.plan === 'trial' && identities.length >= 3}>Add identity</button>
-              <button style={s.cancelBtn} onClick={() => setAddingIdentity(false)}>Cancel</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={addIdentity} disabled={user?.plan === 'trial' && identities.length >= 3} style={{ padding: '10px 24px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                Add identity →
+              </button>
+              <button onClick={() => setAddingIdentity(false)} style={{ padding: '10px 16px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
