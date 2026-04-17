@@ -32,10 +32,11 @@ export default function Homepage() {
         a { color: inherit; text-decoration: none; }
         nav {
           position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 80px; height: 60px;
+          display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+          padding: 0 80px; height: 60px; width: 100%;
           background: rgba(8,8,8,0.85); backdrop-filter: blur(20px);
           border-bottom: 1px solid var(--border);
+          direction: ltr;
         }
         .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
         .nav-logo span { color: var(--accent); }
@@ -132,7 +133,7 @@ export default function Homepage() {
 
       {/* NAV */}
       <nav>
-        <div className="nav-logo">ease<span>.</span>net</div>
+        <div className="nav-logo">easonet</div>
         <ul className="nav-links">
           <li><a href="#tools">Tools</a></li>
           <li><a href="#how">How it works</a></li>
@@ -297,7 +298,7 @@ export default function Homepage() {
       {/* FOOTER */}
       <div className="full-border-top">
         <footer>
-          <div className="footer-logo">ease<span>.</span>net</div>
+          <div className="footer-logo">easonet</div>
           <ul className="footer-links">
             <li><a href="#tools">Tools</a></li>
             <li><a href="#pricing">Pricing</a></li>
