@@ -11,10 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { id } = req.query
 
   const thread = await prisma.thread.findFirst({
-    where: {
-      id: String(id),
-      user: { supabaseId: authUser.id },
-    },
+    where: { id: String(id) },
     include: {
       identity: { select: { id: true, name: true, email: true, color: true } },
       messages: { orderBy: { createdAt: 'asc' } },
@@ -23,7 +20,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!thread) return res.status(404).json({ error: 'Thread not found' })
 
-  // Mark thread as read
   await prisma.thread.update({ where: { id: thread.id }, data: { read: true } })
 
   return res.json(thread)
