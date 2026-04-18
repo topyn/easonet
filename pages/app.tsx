@@ -283,7 +283,7 @@ export default function App() {
             {/* Logo */}
             <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${BORDER}` }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 17, letterSpacing: -0.5, color: TEXT }}>
-                ease<span style={{ color: ACCENT }}>.</span>net
+                easonet
               </div>
             </div>
 
