@@ -138,6 +138,7 @@ export default function Homepage() {
           <li><a href="#tools">Tools</a></li>
           <li><a href="#how">How it works</a></li>
           <li><a href="#pricing">Pricing</a></li>
+          <li><a href="/setup">Setup guide</a></li>
         </ul>
         <div className="nav-cta">
           <a href="/login"><button className="btn-ghost">Sign in</button></a>
