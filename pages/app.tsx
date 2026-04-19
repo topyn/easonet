@@ -39,9 +39,13 @@ function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
 
 // ── DNS Wizard ────────────────────────────────────────────────────────────
+type DnsProvider = 'Cloudflare' | 'GoDaddy' | 'Namecheap'
+const DNS_PROVIDERS: DnsProvider[] = ['Cloudflare', 'GoDaddy', 'Namecheap']
+
 function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: () => void }) {
   const [step, setStep] = useState<'records' | 'checking' | 'done'>('records')
   const [dns, setDns] = useState<DnsResult | null>(null)
+  const [provider, setProvider] = useState<DnsProvider>('Cloudflare')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const startChecking = useCallback(() => {
@@ -62,6 +66,12 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
 
   const copy = (text: string) => navigator.clipboard.writeText(text)
 
+  const providerNote: Record<DnsProvider, string> = {
+    Cloudflare: 'DNS → Add record → make sure the proxy (orange cloud) is OFF',
+    GoDaddy: 'My Products → your domain → DNS → Add record',
+    Namecheap: 'Domain List → Manage → Advanced DNS → Add New Record',
+  }
+
   if (step === 'done') return (
     <div style={{ padding: 32 }}>
       <div style={{ background: 'rgba(62,207,142,0.08)', border: '1px solid rgba(62,207,142,0.2)', borderRadius: 10, padding: '20px 24px', color: '#3ECF8E', fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
@@ -70,7 +80,7 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
     </div>
   )
 
-  const recordBox = (label: string, fields: {k: string, v: string}[], extra?: string) => (
+  const RecordBox = ({ label, fields, extra }: { label: string; fields: {k: string; v: string}[]; extra?: string }) => (
     <div style={{ background: BG3, border: `1px solid ${BORDER}`, borderRadius: 10, padding: '20px 24px', marginBottom: 12 }}>
       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT, textTransform: 'uppercase' as const, letterSpacing: '.1em', marginBottom: 14 }}>{label}</div>
       {fields.map(f => (
@@ -82,24 +92,44 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
           </div>
         </div>
       ))}
-      {extra && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#444', marginTop: 4 }}>{extra}</div>}
+      {extra && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#555', marginTop: 8 }}>{extra}</div>}
     </div>
   )
 
   return (
     <div style={{ padding: 32, maxWidth: 600 }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: TEXT, letterSpacing: -0.5, marginBottom: 8 }}>Set up {identity.domain}</div>
-      <div style={{ fontSize: 13, color: MUTED, marginBottom: 28, lineHeight: 1.6 }}>Add these two DNS records, then click check. Usually propagates in under 10 minutes.</div>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: TEXT, letterSpacing: -0.5, marginBottom: 6 }}>Set up {identity.domain}</div>
+      <div style={{ fontSize: 13, color: MUTED, marginBottom: 24, lineHeight: 1.6 }}>Add two DNS records to your domain, then click verify. Usually takes under 5 minutes.</div>
 
-      {recordBox('MX record — inbound routing', [
-        { k: 'Name', v: identity.domain },
-        { k: 'Value', v: 'route1.mx.cloudflare.net' },
-      ], 'Priority: 13')}
+      {/* Provider selector */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase' as const, letterSpacing: '.1em', marginBottom: 10 }}>// your dns provider</div>
+        <div style={{ display: 'flex', gap: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 3, width: 'fit-content' }}>
+          {DNS_PROVIDERS.map(p => (
+            <button key={p} onClick={() => setProvider(p)} style={{ padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontSize: 11, background: provider === p ? ACCENT : 'transparent', color: provider === p ? '#fff' : MUTED, transition: 'all .15s' }}>
+              {p}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', marginTop: 10 }}>// navigate to: {providerNote[provider]}</div>
+      </div>
 
-      {recordBox('TXT record — SPF', [
-        { k: 'Name', v: identity.domain },
-        { k: 'Value', v: 'v=spf1 include:_spf.brevo.com ~all' },
-      ])}
+      <RecordBox label="MX record — inbound routing" fields={[
+        { k: 'Type', v: 'MX' },
+        { k: 'Name / Host', v: '@' },
+        { k: 'Value / Mail server', v: 'route1.mx.cloudflare.net' },
+        { k: 'Priority', v: '13' },
+      ]} extra={provider === 'Cloudflare' ? '⚠ Make sure Proxy is OFF (grey cloud, not orange)' : undefined} />
+
+      <RecordBox label="TXT record — SPF (prevents spam)" fields={[
+        { k: 'Type', v: 'TXT' },
+        { k: 'Name / Host', v: '@' },
+        { k: 'Value / Content', v: 'v=spf1 include:_spf.brevo.com ~all' },
+      ]} />
+
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: '#444', fontFamily: "'DM Mono', monospace" }}>
+        // need help? <a href="/setup" target="_blank" style={{ color: ACCENT, textDecoration: 'none' }}>view full setup guide →</a>
+      </div>
 
       {step === 'checking' && (
         <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -111,7 +141,7 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
               <span style={{ color: r.ok ? '#3ECF8E' : MUTED }}>{r.label} {r.ok ? 'verified' : 'checking…'}</span>
             </div>
           ))}
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', marginTop: 4 }}>// polling every 4 seconds</div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', marginTop: 4 }}>// polling every 4 seconds — dns can take up to 10 mins</div>
         </div>
       )}
 
@@ -332,6 +362,19 @@ export default function App() {
                   + add identity
                 </button>
               </div>
+            </div>
+
+            {/* Tools nav */}
+            <div style={{ padding: '8px 16px', borderTop: `1px solid ${BORDER}` }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>// tools</div>
+              <a href="/waitlists" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ECF8E', flexShrink: 0 }} />
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>waitlists</div>
+              </a>
+              <a href="/dns-check" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F5A623', flexShrink: 0 }} />
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>dns checker</div>
+              </a>
             </div>
 
             {/* User row */}
