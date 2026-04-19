@@ -150,10 +150,10 @@ export default function Homepage() {
       <section className="hero">
         <div className="hero-badge">Platform · Now in beta</div>
         <h1>Built for founders who<br /><em>can't stop</em> starting things</h1>
-        <p className="hero-sub">Every new brand has the same setup headaches. We're building the tools to eliminate them — one by one.</p>
+        <p className="hero-sub">The email tool built for founders who run more than one thing. Send from any domain, read everything in one inbox — before you even launch.</p>
         <div className="hero-actions">
           <a href="/login"><button className="btn-hero">Start free — 30 days</button></a>
-          <a href="#tools"><button className="btn-hero-ghost">See the tools →</button></a>
+          <a href="#problem"><button className="btn-hero-ghost">See how it works →</button></a>
         </div>
         <div className="hero-terminal">
           <div className="terminal-bar">
@@ -180,14 +180,47 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* LOGOS */}
-      <div className="full-border-top">
-        <div className="logos">
-          <p>Used by founders running</p>
-          <div className="logos-row">
-            {['E-commerce','SaaS','Agencies','Content','Consulting','Investing'].map(l => (
-              <div key={l} className="logo-item">{l}</div>
-            ))}
+      {/* PROBLEM / SOLUTION */}
+      <div className="full-border-top" id="problem">
+        <div style={{maxWidth:'1400px',margin:'0 auto',padding:'0 80px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1px',background:'rgba(255,255,255,0.08)'}}>
+            <div style={{padding:'60px 48px',background:'#080808'}}>
+              <div style={{fontFamily:"'DM Mono', monospace",fontSize:11,color:'#333',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:24}}>// the problem</div>
+              <div style={{display:'flex',flexDirection:'column',gap:20}}>
+                {[
+                  { icon: '✗', text: "You registered 3 domains last month. Now you need professional email for each one — but setting up a mailbox per domain is slow, expensive, and means logging into multiple accounts all day." },
+                  { icon: '✗', text: "You're in idea validation mode. You don't want to pay for Google Workspace for a project that might not go anywhere. But using Gmail looks unprofessional to potential customers and partners." },
+                  { icon: '✗', text: "A reply to your client pitch went to the wrong inbox. A supplier email got missed for a week. Managing multiple brands across multiple inboxes is a full-time job." },
+                ].map((item, i) => (
+                  <div key={i} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
+                    <div style={{fontFamily:"'DM Mono', monospace",fontSize:13,color:'#ff6b6b',marginTop:2,flexShrink:0}}>{item.icon}</div>
+                    <div style={{fontSize:14,color:'#555',lineHeight:1.7}}>{item.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{padding:'60px 48px',background:'#0d0d0d'}}>
+              <div style={{fontFamily:"'DM Mono', monospace",fontSize:11,color:'#7B6EF6',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:24}}>// the easonet way</div>
+              <div style={{display:'flex',flexDirection:'column',gap:20}}>
+                {[
+                  { icon: '✓', text: "Add any email address on any domain you own. Two DNS records, five minutes, and you're sending professional email from that identity." },
+                  { icon: '✓', text: "All your brands live in one inbox. Emails are tagged by identity so you always know which business a conversation belongs to. No switching, no confusion." },
+                  { icon: '✓', text: "Test new ideas without commitment. Spin up a new brand identity in minutes, validate before you invest. If the idea doesn't fly, just remove it." },
+                ].map((item, i) => (
+                  <div key={i} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
+                    <div style={{fontFamily:"'DM Mono', monospace",fontSize:13,color:'#3ECF8E',marginTop:2,flexShrink:0}}>{item.icon}</div>
+                    <div style={{fontSize:14,color:'#888',lineHeight:1.7}}>{item.text}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{marginTop:36}}>
+                <a href="/login">
+                  <button style={{padding:'11px 28px',background:'#7B6EF6',color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:500,cursor:'pointer',fontFamily:"'DM Sans', sans-serif"}}>
+                    Try it free →
+                  </button>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -195,8 +228,8 @@ export default function Homepage() {
       {/* TOOLS */}
       <section className="section" id="tools">
         <div className="section-label">// tools</div>
-        <h2 className="section-title">Launching a new brand?<br />We've got the toolkit.</h2>
-        <p className="section-sub">We're rolling out tools in the order founders actually need them. Starting with the basics.</p>
+        <h2 className="section-title">Everything a new brand<br />needs to get started.</h2>
+        <p className="section-sub">We're building tools in the order you actually need them — from first email to first invoice.</p>
         <div className="tools-grid">
           <div className="tool-card active">
             <div className="tool-status live"><div className="tool-status-dot"></div> Live now</div>
@@ -226,14 +259,14 @@ export default function Homepage() {
       <div className="full-border-top">
         <section className="section" id="how">
           <div className="section-label">// how it works</div>
-          <h2 className="section-title">Up and running<br />in minutes</h2>
-          <p className="section-sub">No mail servers. No complex setup. Just DNS records and you're live.</p>
+          <h2 className="section-title">From zero to professional<br />email in 5 minutes</h2>
+          <p className="section-sub">No mail servers to manage. No expensive workspace subscriptions. Just two DNS records and you're live.</p>
           <div className="steps">
             {[
-              { n: '01', title: 'Create account', desc: 'Sign up free. 30-day trial, no credit card required. Start with up to 3 domain identities.' },
-              { n: '02', title: 'Add your domains', desc: 'Enter any email address on any domain you own. We show you exactly which DNS records to add.' },
-              { n: '03', title: 'DNS verified', desc: 'Our live checker confirms your records propagated. Usually takes under 5 minutes.' },
-              { n: '04', title: 'Start sending', desc: 'Compose from any identity. Replies come back to your unified inbox, tagged by brand.' },
+              { n: '01', title: 'Sign up free', desc: 'Create an account in 30 seconds. 30-day trial, no credit card. Start with up to 3 domain identities.' },
+              { n: '02', title: 'Add an identity', desc: 'Enter any email on any domain you own — mark@yourbrand.com, hello@project.io, anything. We show you the exact DNS records to add.' },
+              { n: '03', title: 'Verify in seconds', desc: 'Our live DNS checker polls every few seconds and confirms the moment your records propagate. Usually under 5 minutes.' },
+              { n: '04', title: 'Send & receive', desc: 'Compose emails from any identity. Replies arrive in your unified inbox, tagged by brand so you always know which business it belongs to.' },
             ].map(s => (
               <div key={s.n} className="step">
                 <div className="step-num">{s.n} —</div>
