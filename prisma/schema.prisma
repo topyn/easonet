@@ -19,6 +19,7 @@ model User {
   createdAt         DateTime   @default(now())
   identities        Identity[]
   threads           Thread[]
+  waitlists         Waitlist[]
 }
 
 model Identity {
@@ -37,6 +38,7 @@ model Identity {
   createdAt    DateTime  @default(now())
   threads      Thread[]
   sentMessages Message[] @relation("SentMessages")
+  waitlists    Waitlist[]
 }
 
 model Thread {
@@ -67,4 +69,33 @@ model Message {
   sentByIdentityId String?
   sentByIdentity   Identity? @relation("SentMessages", fields: [sentByIdentityId], references: [id])
   createdAt        DateTime  @default(now())
+}
+
+model Waitlist {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id])
+  identityId   String?
+  identity     Identity?        @relation(fields: [identityId], references: [id])
+  name         String
+  slug         String           @unique
+  headline     String           @default("Get early access")
+  description  String?
+  buttonText   String           @default("Join waitlist")
+  thankYouMsg  String           @default("You're on the list! We'll be in touch.")
+  showCount    Boolean          @default(true)
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  signups      WaitlistSignup[]
+}
+
+model WaitlistSignup {
+  id         String   @id @default(cuid())
+  waitlistId String
+  waitlist   Waitlist @relation(fields: [waitlistId], references: [id])
+  email      String
+  name       String?
+  createdAt  DateTime @default(now())
+
+  @@unique([waitlistId, email])
 }
