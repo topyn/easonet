@@ -1,4 +1,78 @@
 import Head from 'next/head'
+import { useState } from 'react'
+
+function ContactForm() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit() {
+    if (!name || !email || !message) return
+    setLoading(true); setError('')
+    const res = await fetch('/api/contact/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, message }),
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) { setError(data.error || 'Something went wrong'); return }
+    setSent(true)
+  }
+
+  const inputStyle = {
+    width: '100%', padding: '12px 16px',
+    background: '#101010', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 8, fontSize: 14, color: '#f0f0ee',
+    fontFamily: "'DM Sans', sans-serif", outline: 'none',
+    boxSizing: 'border-box' as const, transition: 'border-color .2s',
+  }
+
+  if (sent) return (
+    <div style={{background:'rgba(62,207,142,0.06)',border:'1px solid rgba(62,207,142,0.2)',borderRadius:14,padding:'40px 32px',textAlign:'center'}}>
+      <div style={{fontSize:28,marginBottom:12}}>✓</div>
+      <div style={{fontFamily:"'Syne', sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:'#3ECF8E',marginBottom:8}}>Message sent</div>
+      <div style={{fontSize:14,color:'#666',lineHeight:1.7}}>We'll get back to you at {email} within 24 hours.</div>
+    </div>
+  )
+
+  return (
+    <div style={{background:'#101010',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14,padding:'32px'}}>
+      {error && <div style={{fontFamily:"'DM Mono', monospace",fontSize:12,color:'#ff6b6b',background:'rgba(255,107,107,0.08)',border:'1px solid rgba(255,107,107,0.2)',padding:'10px 14px',borderRadius:8,marginBottom:16}}>{error}</div>}
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div>
+          <label style={{fontFamily:"'DM Mono', monospace",fontSize:10,color:'#444',display:'block',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>Your name</label>
+          <input style={inputStyle} placeholder="Mark Barnett" value={name} onChange={e => setName(e.target.value)} />
+        </div>
+        <div>
+          <label style={{fontFamily:"'DM Mono', monospace",fontSize:10,color:'#444',display:'block',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>Email address</label>
+          <input style={inputStyle} type="email" placeholder="mark@yourdomain.com" value={email} onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div>
+          <label style={{fontFamily:"'DM Mono', monospace",fontSize:10,color:'#444',display:'block',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>Message</label>
+          <textarea
+            style={{...inputStyle,resize:'none',height:120,lineHeight:1.6}}
+            placeholder="Tell us what you're working on or ask us anything..."
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && e.metaKey && submit()}
+          />
+        </div>
+        <button
+          onClick={submit}
+          disabled={loading || !name || !email || !message}
+          style={{padding:'13px',background:loading||!name||!email||!message?'#1a1a1a':'#7B6EF6',color:loading||!name||!email||!message?'#333':'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:500,cursor:loading||!name||!email||!message?'not-allowed':'pointer',fontFamily:"'DM Sans', sans-serif",transition:'background .2s'}}
+        >
+          {loading ? '// sending…' : 'Send message →'}
+        </button>
+        <div style={{fontFamily:"'DM Mono', monospace",fontSize:10,color:'#222',textAlign:'center'}}>we reply within 24 hours</div>
+      </div>
+    </div>
+  )
+}
 
 export default function Homepage() {
   return (
@@ -329,6 +403,34 @@ export default function Homepage() {
         </section>
       </div>
 
+      {/* CONTACT */}
+      <div className="full-border-top" id="contact">
+        <section className="section">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'80px',alignItems:'start'}}>
+            <div>
+              <div className="section-label">// get in touch</div>
+              <h2 className="section-title">Questions?<br />We'd love to hear from you.</h2>
+              <p style={{fontSize:15,color:'#666',lineHeight:1.8,marginTop:16}}>
+                Whether you're wondering if easonet is right for your situation, need help with DNS setup, or just want to say hello — send us a message and we'll get back to you within 24 hours.
+              </p>
+              <div style={{marginTop:32,display:'flex',flexDirection:'column',gap:14}}>
+                {[
+                  {icon:'✉', text:'Reply from mark@easonet.com'},
+                  {icon:'⏱', text:'Response within 24 hours'},
+                  {icon:'◈', text:'Real human, not a bot'},
+                ].map(item => (
+                  <div key={item.text} style={{display:'flex',alignItems:'center',gap:12}}>
+                    <div style={{fontFamily:"'DM Mono', monospace",fontSize:14,color:'#7B6EF6',width:20}}>{item.icon}</div>
+                    <div style={{fontSize:14,color:'#555'}}>{item.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <ContactForm />
+          </div>
+        </section>
+      </div>
+
       {/* FOOTER */}
       <div className="full-border-top">
         <footer>
@@ -336,8 +438,8 @@ export default function Homepage() {
           <ul className="footer-links">
             <li><a href="#tools">Tools</a></li>
             <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#contact">Contact</a></li>
             <li><a href="/login">Sign in</a></li>
-            <li><a href="#">Privacy</a></li>
           </ul>
           <div className="footer-copy">© 2026 easonet</div>
         </footer>
