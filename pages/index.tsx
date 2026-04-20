@@ -45,7 +45,7 @@ function ContactForm() {
       <div style={{display:'flex',flexDirection:'column',gap:14}}>
         <div>
           <label style={{fontFamily:"'DM Mono', monospace",fontSize:10,color:'#444',display:'block',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>Your name</label>
-          <input style={inputStyle} placeholder="Mark Barnett" value={name} onChange={e => setName(e.target.value)} />
+          <input style={inputStyle} placeholder="Your name" value={name} onChange={e => setName(e.target.value)} />
         </div>
         <div>
           <label style={{fontFamily:"'DM Mono', monospace",fontSize:10,color:'#444',display:'block',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>Email address</label>
