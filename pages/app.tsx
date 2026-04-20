@@ -205,14 +205,24 @@ export default function App() {
   const [newColor, setNewColor] = useState(COLORS[0])
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('easonet_token')
-      const userStr = localStorage.getItem('easonet_user')
-      if (!token || !userStr) { router.replace('/login'); return }
-      setUser(JSON.parse(userStr))
-      setLoading(false)
-    } catch { router.replace('/login') }
-  }, [])
+  try {
+    const token = localStorage.getItem('easonet_token')
+    const userStr = localStorage.getItem('easonet_user')
+    if (!token || !userStr) { router.replace('/login'); return }
+    // Set user from localStorage immediately for fast load
+    setUser(JSON.parse(userStr))
+    setLoading(false)
+    // Then refresh from server to get latest plan
+    fetch('/api/auth/session', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(r => r.json()).then(data => {
+      if (data.user) {
+        setUser(data.user)
+        localStorage.setItem('easonet_user', JSON.stringify(data.user))
+      }
+    })
+  } catch { router.replace('/login') }
+}, [])
 
   const loadIdentities = useCallback(async () => {
     const data = await api('/api/identities')
