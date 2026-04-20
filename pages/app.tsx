@@ -205,24 +205,21 @@ export default function App() {
   const [newColor, setNewColor] = useState(COLORS[0])
 
   useEffect(() => {
-  try {
-    const token = localStorage.getItem('easonet_token')
-    const userStr = localStorage.getItem('easonet_user')
-    if (!token || !userStr) { router.replace('/login'); return }
-    // Set user from localStorage immediately for fast load
-    setUser(JSON.parse(userStr))
-    setLoading(false)
-    // Then refresh from server to get latest plan
-    fetch('/api/auth/session', {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.json()).then(data => {
-      if (data.user) {
-        setUser(data.user)
-        localStorage.setItem('easonet_user', JSON.stringify(data.user))
-      }
-    })
-  } catch { router.replace('/login') }
-}, [])
+    try {
+      const token = localStorage.getItem('easonet_token')
+      const userStr = localStorage.getItem('easonet_user')
+      if (!token || !userStr) { router.replace('/login'); return }
+      setUser(JSON.parse(userStr))
+      setLoading(false)
+      fetch('/api/auth/session', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json()).then(data => {
+          if (data.user) {
+            setUser(data.user)
+            localStorage.setItem('easonet_user', JSON.stringify(data.user))
+          }
+        })
+    } catch { router.replace('/login') }
+  }, [])
 
   const loadIdentities = useCallback(async () => {
     const data = await api('/api/identities')
@@ -388,24 +385,16 @@ export default function App() {
             </div>
 
             {/* User row */}
-<div style={{ padding: '12px 16px', borderTop: `1px solid ${BORDER}` }}>
-  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{user?.email}</div>
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-    <div style={{ 
-      fontFamily: "'DM Mono', monospace", fontSize: 9, 
-      color: user?.plan === 'trial' ? '#F5A623' : '#3ECF8E',
-      background: user?.plan === 'trial' ? 'rgba(245,166,35,0.1)' : 'rgba(62,207,142,0.1)',
-      border: `1px solid ${user?.plan === 'trial' ? 'rgba(245,166,35,0.2)' : 'rgba(62,207,142,0.2)'}`,
-      padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.08em'
-    }}>
-      {user?.plan === 'trial' ? 'trial' : user?.plan}
-    </div>
-    {user?.plan === 'trial' && (
-      <a href="#" onClick={e => { e.preventDefault(); window.location.href = '/app' }} style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: ACCENT, textDecoration: 'none' }}>upgrade</a>
-    )}
-  </div>
-  <button onClick={logout} style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>// sign out</button>
-</div>
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${BORDER}` }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{user?.email}</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: user?.plan === 'trial' ? '#F5A623' : '#3ECF8E', background: user?.plan === 'trial' ? 'rgba(245,166,35,0.1)' : 'rgba(62,207,142,0.1)', border: `1px solid ${user?.plan === 'trial' ? 'rgba(245,166,35,0.2)' : 'rgba(62,207,142,0.2)'}`, padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase' as const, letterSpacing: '.08em' }}>
+                  {user?.plan === 'trial' ? 'trial' : user?.plan}
+                </div>
+              </div>
+              <button onClick={logout} style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>// sign out</button>
+            </div>
+          </div>
 
           {/* Main */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
