@@ -20,7 +20,8 @@ model User {
   identities        Identity[]
   threads           Thread[]
   waitlists         Waitlist[]
-  stores Store[]
+  stores            Store[]
+  brandPages        BrandPage[]
 }
 
 model Identity {
@@ -40,7 +41,8 @@ model Identity {
   threads      Thread[]
   sentMessages Message[] @relation("SentMessages")
   waitlists    Waitlist[]
-  stores Store[]
+  stores       Store[]
+  brandPages   BrandPage[]
 }
 
 model Thread {
@@ -89,6 +91,7 @@ model Waitlist {
   active       Boolean          @default(true)
   createdAt    DateTime         @default(now())
   signups      WaitlistSignup[]
+  brandPages   BrandPage[]
 }
 
 model WaitlistSignup {
@@ -115,6 +118,7 @@ model Store {
   createdAt   DateTime  @default(now())
   products    Product[]
   orders      Order[]
+  brandPages  BrandPage[]
 }
 
 model Product {
@@ -125,7 +129,7 @@ model Product {
   description  String?
   price        Float
   currency     String   @default("USD")
-  type         String   @default("digital")
+  type         String   @default("digital") // digital | physical
   imageUrl     String?
   fileUrl      String?
   deliveryNote String?
@@ -147,7 +151,32 @@ model Order {
   quantity      Int      @default(1)
   total         Float
   currency      String   @default("USD")
-  status        String   @default("pending")
+  status        String   @default("pending") // pending | paid | fulfilled | cancelled
   paypalOrderId String?
+  createdAt     DateTime @default(now())
+}
+
+model BrandPage {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  identityId    String?
+  identity      Identity? @relation(fields: [identityId], references: [id])
+  storeId       String?
+  store         Store?   @relation(fields: [storeId], references: [id])
+  waitlistId    String?
+  waitlist      Waitlist? @relation(fields: [waitlistId], references: [id])
+  slug          String   @unique
+  title         String
+  tagline       String?
+  description   String?
+  logoUrl       String?
+  accentColor   String   @default("#7B6EF6")
+  bgStyle       String   @default("dark")
+  fontStyle     String   @default("modern")
+  customDomain  String?  @unique
+  links         Json     @default("[]")
+  sections      Json     @default("[]")
+  active        Boolean  @default(true)
   createdAt     DateTime @default(now())
 }

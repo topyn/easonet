@@ -238,11 +238,9 @@ export default function App() {
   useEffect(() => { if (!loading) { loadIdentities(); loadThreads() } }, [loading])
 
   async function openThread(t: Thread) {
-  const data = await api(`/api/emails/thread/${t.id}`)
-  setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
-  // Mark as read in local state
-  setThreads(prev => prev.map(th => th.id === t.id ? { ...th, read: true } : th))
-}
+    const data = await api(`/api/emails/thread/${t.id}`)
+    setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
+  }
 
   async function sendEmail() {
     if (!composeTo || !composeSubject || !composeText || !composeIdentityId) return
@@ -379,6 +377,14 @@ export default function App() {
               <a href="/waitlists" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ECF8E', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>waitlists</div>
+              </a>
+              <a href="/stores" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#60A5FA', flexShrink: 0 }} />
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>stores</div>
+              </a>
+              <a href="/brandpages" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F87171', flexShrink: 0 }} />
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>brand pages</div>
               </a>
               <a href="/dns-check" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F5A623', flexShrink: 0 }} />
