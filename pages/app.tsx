@@ -20,12 +20,6 @@ const TEXT = '#f0f0ee'
 const MUTED = '#666'
 const ACCENT = '#7B6EF6'
 
-function getToken() {
-  try { return localStorage.getItem('easonet_token') ?? '' } catch { return '' }
-}
-
-
-
 function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
 
