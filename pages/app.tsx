@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import { authFetch, getToken, clearTokens, setTokens } from '../lib/auth-client'
 
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
 interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean }
