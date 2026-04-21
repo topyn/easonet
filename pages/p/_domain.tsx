@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import BrandPageContent from '../../components/BrandPageContent'
 
 export default function DomainRedirect() {
   const router = useRouter()
   const { domain } = router.query
+  const [pageData, setPageData] = useState<any>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
@@ -12,11 +14,8 @@ export default function DomainRedirect() {
     fetch(`https://www.easonet.com/api/brandpages/info?domain=${domain}`)
       .then(r => r.json())
       .then(data => {
-        if (data.slug) {
-          router.replace(`/p/${data.slug}`)
-        } else {
-          setError(true)
-        }
+        if (data.id) setPageData(data)
+        else setError(true)
       })
       .catch(() => setError(true))
   }, [domain])
@@ -31,9 +30,11 @@ export default function DomainRedirect() {
     </>
   )
 
-  return (
+  if (!pageData) return (
     <div style={{ minHeight: '100vh', background: '#080808', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', fontSize: 12, color: '#333' }}>
       // loading…
     </div>
   )
+
+  return <BrandPageContent page={pageData} />
 }
