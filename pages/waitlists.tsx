@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import { authFetch, getToken, clearTokens, setTokens, refreshTokenIfNeeded } from '../lib/auth-client'
 
 interface Waitlist {
   id: string; name: string; slug: string; headline: string
@@ -15,7 +16,7 @@ const BG = '#080808', BG2 = '#101010', BG3 = '#161616'
 const BORDER = 'rgba(255,255,255,0.07)', BORDER2 = 'rgba(255,255,255,0.12)'
 const TEXT = '#f0f0ee', MUTED = '#666', ACCENT = '#7B6EF6'
 
-function getToken() { try { return localStorage.getItem('easonet_token') ?? '' } catch { return '' } }
+
 function authFetch(url: string, opts: RequestInit = {}) {
   return fetch(url, { ...opts, headers: { ...opts.headers as any, Authorization: `Bearer ${getToken()}`, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } })
 }

@@ -40,8 +40,11 @@ export default function LoginPage() {
         const data = await res.json()
         if (!res.ok) { setError(data.error || 'Login failed'); setLoading(false); return }
         if (data.access_token) {
+          const expiry = Date.now() + 55 * 60 * 1000
           localStorage.setItem('easonet_token', data.access_token)
+          localStorage.setItem('easonet_refresh_token', data.refresh_token || '')
           localStorage.setItem('easonet_user', JSON.stringify(data.user))
+          localStorage.setItem('easonet_token_expiry', String(expiry))
         }
         router.push('/app')
       }

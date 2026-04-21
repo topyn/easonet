@@ -27,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(200).json({
     access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
     user: dbUser,
   })
 }

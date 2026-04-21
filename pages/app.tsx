@@ -23,17 +23,7 @@ function getToken() {
   try { return localStorage.getItem('easonet_token') ?? '' } catch { return '' }
 }
 
-function authFetch(url: string, options: RequestInit = {}) {
-  const token = getToken()
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    },
-  })
-}
+
 
 function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
@@ -215,7 +205,7 @@ export default function App() {
         .then(r => r.json()).then(data => {
           if (data.user) {
             setUser(data.user)
-            localStorage.setItem('easonet_user', JSON.stringify(data.user))
+            if (data.user) setTokens(getToken(), localStorage.getItem('easonet_refresh_token') || '', data.user)
           }
         })
     } catch { router.replace('/login') }
@@ -265,8 +255,7 @@ export default function App() {
   }
 
   async function logout() {
-    localStorage.removeItem('easonet_token')
-    localStorage.removeItem('easonet_user')
+    clearTokens()
     router.replace('/login')
   }
 
