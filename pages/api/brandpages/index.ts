@@ -40,8 +40,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     const existing = await prisma.brandPage.findUnique({ where: { slug: parsed.data.slug } })
     if (existing) return res.status(400).json({ error: 'That slug is already taken' })
+    const data = parsed.data
     const page = await prisma.brandPage.create({
-      data: { ...parsed.data, userId: dbUser.id },
+      data: {
+        ...data,
+        userId: dbUser.id,
+        storeId: data.storeId || null,
+        waitlistId: data.waitlistId || null,
+        identityId: data.identityId || null,
+        customDomain: data.customDomain || null,
+      },
     })
     return res.status(201).json(page)
   }
