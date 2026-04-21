@@ -231,7 +231,7 @@ export default function Homepage() {
       <section className="section" id="tools">
         <div className="section-label">// tools</div>
         <h2 className="section-title">Everything a new brand<br />needs to get started.</h2>
-        <p className="section-sub">We're building tools in the order you actually need them — from first email to first invoice.</p>
+        <p className="section-sub">We're building tools in the order you actually need them. Several are already live.</p>
         <div className="tools-grid">
           <div className="tool-card active">
             <div className="tool-status live"><div className="tool-status-dot"></div> Live now</div>
@@ -240,11 +240,30 @@ export default function Homepage() {
             <p className="tool-desc">Send and receive from unlimited domain identities. One inbox, every brand. No separate mailboxes needed.</p>
             <a href="/login" className="tool-link">Open inbox →</a>
           </div>
+          <div className="tool-card active">
+            <div className="tool-status live"><div className="tool-status-dot"></div> Live now</div>
+            <span className="tool-icon">⬡</span>
+            <div className="tool-name">Brand pages</div>
+            <p className="tool-desc">A hosted page for every brand. Links, store, waitlist, contact form — all in one place. Point your own domain at it in minutes.</p>
+            <a href="/login" className="tool-link">Create a page →</a>
+          </div>
+          <div className="tool-card active">
+            <div className="tool-status live"><div className="tool-status-dot"></div> Live now</div>
+            <span className="tool-icon">◻</span>
+            <div className="tool-name">Store & checkout</div>
+            <p className="tool-desc">Sell digital and physical products from any brand. PayPal checkout built in. Orders and notifications all in your easonet inbox.</p>
+            <a href="/login" className="tool-link">Open store →</a>
+          </div>
+          <div className="tool-card active">
+            <div className="tool-status live"><div className="tool-status-dot"></div> Live now</div>
+            <span className="tool-icon">◈</span>
+            <div className="tool-name">Waitlists</div>
+            <p className="tool-desc">Capture interest before you launch. Embeddable on any site. All signups tagged by brand in one dashboard.</p>
+            <a href="/login" className="tool-link">Create a waitlist →</a>
+          </div>
           {[
-            { icon: '◈', name: 'Domain manager', desc: 'All your domains in one place. Track renewals, manage DNS records, and monitor health across every registrar.' },
-            { icon: '⬡', name: 'Brand landing pages', desc: 'A clean branded page for every project before the full site is ready. Links, contact form, social handles — live in minutes.' },
-            { icon: '⊡', name: 'Contact forms', desc: 'Embeddable forms that route enquiries straight to your easonet inbox — already tagged with which brand they came from.' },
-            { icon: '◻', name: 'Invoices & quotes', desc: 'Send professional invoices from any brand identity. Switch sender the same way you switch email — no separate accounts.' },
+            { icon: '⊡', name: 'Domain manager', desc: 'All your domains in one place. Track renewals, manage DNS health, and get alerts before anything expires.' },
+            { icon: '▣', name: 'Invoices & quotes', desc: 'Send professional invoices from any brand identity. Switch sender the same way you switch email — no separate accounts.' },
           ].map(t => (
             <div key={t.name} className="tool-card">
               <div className="tool-status soon"><div className="tool-status-dot"></div> Coming soon</div>
@@ -285,7 +304,7 @@ export default function Homepage() {
         <section className="section" id="pricing">
           <div className="section-label">// pricing</div>
           <h2 className="section-title">Simple pricing.<br />Scale as you grow.</h2>
-          <p className="section-sub">Priced per domain, not per email. Add a new brand in minutes, not days.</p>
+          <p className="section-sub">One subscription covers all tools. Add a new brand in minutes, not days.</p>
           <div className="pricing-grid">
             <div className="pricing-card">
               <div className="pricing-plan">Starter</div>
@@ -294,9 +313,9 @@ export default function Homepage() {
               <div className="pricing-divider"></div>
               <ul className="pricing-features">
                 <li>Up to 5 domain identities</li>
-                <li>Unified inbox</li>
-                <li>DNS wizard</li>
-                <li>Thread history</li>
+                <li>Multi-brand email</li>
+                <li>Brand pages</li>
+                <li>Waitlists & stores</li>
               </ul>
               <a href="/login"><button className="btn-plan">Start free trial</button></a>
             </div>
@@ -310,7 +329,7 @@ export default function Homepage() {
                 <li>Up to 20 domain identities</li>
                 <li>Everything in Starter</li>
                 <li>Priority support</li>
-                <li>Early access to new tools</li>
+                <li>First access to new tools</li>
               </ul>
               <a href="/login"><button className="btn-plan featured-btn">Start free trial</button></a>
             </div>
@@ -322,7 +341,7 @@ export default function Homepage() {
               <ul className="pricing-features">
                 <li>Unlimited domain identities</li>
                 <li>Everything in Growth</li>
-                <li>API access</li>
+                <li>API access (coming soon)</li>
                 <li>Team members (coming soon)</li>
               </ul>
               <a href="/login"><button className="btn-plan">Start free trial</button></a>
