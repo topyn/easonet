@@ -128,7 +128,7 @@ export default function StoresPage() {
                 <div style={{ fontSize: 13, fontWeight: 500, color: TEXT, marginBottom: 4 }}>{s.name}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333' }}>/{s.slug}</div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT }}>{s._count.products} products · {s._count.orders} orders</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT }}>{s._count?.products ?? 0} products · {s._count?.orders ?? 0} orders</div>
                 </div>
               </div>
             ))}
