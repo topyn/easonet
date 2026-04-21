@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { authFetch, getToken, clearTokens, setTokens, refreshTokenIfNeeded } from '../lib/auth-client'
+import { authFetch, clearTokens } from '../lib/auth-client'
 
 interface Waitlist {
   id: string; name: string; slug: string; headline: string

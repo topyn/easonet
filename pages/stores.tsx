@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { authFetch, getToken, clearTokens, setTokens, refreshTokenIfNeeded } from '../lib/auth-client'
+import { authFetch, clearTokens } from '../lib/auth-client'
 
 interface Store { id: string; name: string; slug: string; description?: string; active: boolean; _count: { products: number; orders: number }; identity?: { name: string; color: string } | null }
 interface Product { id: string; name: string; description?: string; price: number; currency: string; type: string; imageUrl?: string; fileUrl?: string; deliveryNote?: string; stock?: number; active: boolean }
@@ -14,7 +14,6 @@ const TEXT = '#f0f0ee', MUTED = '#666', ACCENT = '#7B6EF6'
 
 
 
-function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }
 
 const STATUS_COLORS: Record<string, string> = { pending: '#F5A623', paid: '#3ECF8E', fulfilled: '#7B6EF6', cancelled: '#ff6b6b' }
 

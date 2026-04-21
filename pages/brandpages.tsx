@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { authFetch, getToken, clearTokens, setTokens, refreshTokenIfNeeded } from '../lib/auth-client'
+import { authFetch, clearTokens } from '../lib/auth-client'
 
 interface BrandPage { id: string; slug: string; title: string; tagline?: string; accentColor: string; bgStyle: string; customDomain?: string; active: boolean; identity?: { name: string; color: string } | null }
 interface Store { id: string; name: string; slug: string }
@@ -13,7 +13,6 @@ const TEXT = '#f0f0ee', MUTED = '#666', ACCENT = '#7B6EF6'
 
 
 
-function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }
 
 const ACCENT_COLORS = ['#7B6EF6','#3ECF8E','#F5A623','#60A5FA','#F87171','#A78BFA','#34D399','#FB923C']
 
