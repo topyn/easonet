@@ -17,10 +17,6 @@ const BORDER = 'rgba(255,255,255,0.07)', BORDER2 = 'rgba(255,255,255,0.12)'
 const TEXT = '#f0f0ee', MUTED = '#666', ACCENT = '#7B6EF6'
 
 
-function authFetch(url: string, opts: RequestInit = {}) {
-  return fetch(url, { ...opts, headers: { ...opts.headers as any, Authorization: `Bearer ${getToken()}`, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } })
-}
-
 function slugify(str: string) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
