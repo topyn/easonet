@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { addDomainToVercel, removeDomainFromVercel } from '../../../lib/vercel'
 import { prisma } from '../../../lib/prisma'
 import { getUser } from '../../../lib/supabase-server'
 
@@ -38,7 +39,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         active,
       },
     })
-    return res.json(updated)
+
+    // Auto-register new custom domain with Vercel
+    const oldDomain = page.customDomain
+    const newDomain = customDomain || null
+    if (newDomain && newDomain !== oldDomain) {
+      const result = await addDomainToVercel(newDomain)
+      if (!result.success) console.warn('Could not auto-register domain with Vercel:', result.error)
+    }
+    // Remove old domain from Vercel if changed
+    if (oldDomain && oldDomain !== newDomain) {
+      await removeDomainFromVercel(oldDomain)
+    }
+
+    return res.json({ ...updated, vercelDomainAdded: !!newDomain })
   }
 
   if (req.method === 'DELETE') {
