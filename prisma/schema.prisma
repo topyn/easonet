@@ -177,6 +177,18 @@ model BrandPage {
   customDomain  String?  @unique
   links         Json     @default("[]")
   sections      Json     @default("[]")
+  template      String   @default("1")
+  heroImage     String?
+  headlineLine1 String?
+  headlineLine2 String?
+  badgeText     String?
+  ctaText       String?
+  featuresHeadline String?
+  features      Json     @default("[]")
+  stats         Json     @default("[]")
+  aboutHeadline String?
+  contactHeadline String?
+  contactSub    String?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
 }

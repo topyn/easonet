@@ -49,6 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         waitlistId: data.waitlistId || null,
         identityId: data.identityId || null,
         customDomain: data.customDomain || null,
+        heroImage: data.heroImage || null,
+        headlineLine1: data.headlineLine1 || null,
+        headlineLine2: data.headlineLine2 || null,
+        badgeText: data.badgeText || null,
+        ctaText: data.ctaText || null,
+        featuresHeadline: data.featuresHeadline || null,
+        aboutHeadline: data.aboutHeadline || null,
+        contactHeadline: data.contactHeadline || null,
+        contactSub: data.contactSub || null,
       },
     })
     return res.status(201).json(page)

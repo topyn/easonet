@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') return res.json(page)
 
   if (req.method === 'PUT') {
-    const { slug, title, tagline, description, logoUrl, accentColor, bgStyle, fontStyle, customDomain, storeId, waitlistId, identityId, links, sections, active } = req.body
+    const { slug, title, tagline, description, logoUrl, accentColor, bgStyle, fontStyle, customDomain, storeId, waitlistId, identityId, links, sections, active, template, heroImage, headlineLine1, headlineLine2, badgeText, ctaText, featuresHeadline, features, stats, aboutHeadline, contactHeadline, contactSub } = req.body
     const updated = await prisma.brandPage.update({
       where: { id: String(id) },
       data: {
@@ -37,6 +37,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         links: links || [],
         sections: sections || [],
         active,
+        template: template || '1',
+        heroImage: heroImage || null,
+        headlineLine1: headlineLine1 || null,
+        headlineLine2: headlineLine2 || null,
+        badgeText: badgeText || null,
+        ctaText: ctaText || null,
+        featuresHeadline: featuresHeadline || null,
+        features: features || [],
+        stats: stats || [],
+        aboutHeadline: aboutHeadline || null,
+        contactHeadline: contactHeadline || null,
+        contactSub: contactSub || null,
       },
     })
 
