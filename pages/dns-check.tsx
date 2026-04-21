@@ -3,11 +3,16 @@ import { useState } from 'react'
 
 type Status = 'ok' | 'wrong' | 'missing' | 'needs-update' | 'partial'
 
+interface Conflict { type: string; severity: 'error' | 'warning'; message: string; fix: string }
 interface DnsResult {
   domain: string
   currentProvider: string
+  aRecords: string[]
+  conflicts: Conflict[]
+  hasErrors: boolean
+  hasWarnings: boolean
   mx: { records: {exchange: string; priority: number}[]; hasCloudflareRouting: boolean; status: Status }
-  spf: { record: string | null; hasBrevoSpf: boolean; status: Status }
+  spf: { record: string | null; allRecords: string[]; hasBrevoSpf: boolean; status: Status }
   dkim: { brevo1: boolean; brevo2: boolean; status: Status }
   dmarc: { record: string | null; status: Status }
   allGood: boolean
@@ -180,6 +185,44 @@ export default function DnsCheckPage() {
                 </div>
               </div>
             </div>
+
+            {/* Conflicts */}
+            {result.conflicts && result.conflicts.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#ff6b6b', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12 }}>// conflicts detected</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {result.conflicts.map((c, i) => (
+                    <div key={i} style={{ background: c.severity === 'error' ? 'rgba(255,107,107,0.06)' : 'rgba(245,166,35,0.06)', border: `1px solid ${c.severity === 'error' ? 'rgba(255,107,107,0.2)' : 'rgba(245,166,35,0.2)'}`, borderRadius: 10, padding: '16px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: c.severity === 'error' ? '#ff6b6b' : '#F5A623', fontWeight: 500 }}>{c.severity === 'error' ? '✗' : '⚠'} {c.type}</div>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#888', lineHeight: 1.7, marginBottom: 10 }}>{c.message}</div>
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#444', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>// how to fix</div>
+                      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.7 }}>{c.fix}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* A Records */}
+            {result.aRecords && result.aRecords.length > 0 && (
+              <div style={{ background: '#101010', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>A Records — website routing</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: result.hasErrors ? '#ff6b6b' : '#3ECF8E', background: result.hasErrors ? 'rgba(255,107,107,0.08)' : 'rgba(62,207,142,0.08)', border: `1px solid ${result.hasErrors ? 'rgba(255,107,107,0.25)' : 'rgba(62,207,142,0.25)'}`, padding: '3px 10px', borderRadius: 100 }}>{result.aRecords.length} record{result.aRecords.length !== 1 ? 's' : ''}</div>
+                </div>
+                <div style={{ padding: '20px 24px' }}>
+                  {result.aRecords.map((ip, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#f0f0ee' }}>{ip}</div>
+                      {ip === '76.76.21.21' && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#3ECF8E' }}>// vercel</div>}
+                      {['50.63.202.45','160.153.137.167','184.168.131.241'].includes(ip) && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#ff6b6b' }}>// parked — delete this</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* MX Records */}
             <Section title="MX Records — inbound email routing" status={result.mx.status}>
