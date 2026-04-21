@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { authFetch, clearTokens } from '../lib/auth-client'
+function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '') }
 
 interface BrandPage { id: string; slug: string; title: string; tagline?: string; accentColor: string; bgStyle: string; customDomain?: string; active: boolean; identity?: { name: string; color: string } | null }
 interface Store { id: string; name: string; slug: string }
