@@ -9,13 +9,11 @@ export default function DomainRedirect() {
 
   useEffect(() => {
     if (!domain) return
-    // Always fetch from easonet.com regardless of current host
     fetch(`https://www.easonet.com/api/brandpages/info?domain=${domain}`)
       .then(r => r.json())
       .then(data => {
         if (data.slug) {
-          // Render the brand page inline by redirecting to the slug
-          router.replace(`/p/${data.slug}?domain=${domain}`)
+          router.replace(`/p/${data.slug}`)
         } else {
           setError(true)
         }
