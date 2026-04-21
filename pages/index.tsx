@@ -1,13 +1,17 @@
 import Head from 'next/head'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function ContactForm() {
+  const [mounted, setMounted] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return <div style={{height:320,background:'#101010',border:'1px solid rgba(255,255,255,0.08)',borderRadius:14}} />
 
   async function submit() {
     if (!name || !email || !message) return
