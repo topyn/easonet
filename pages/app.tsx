@@ -238,9 +238,11 @@ export default function App() {
   useEffect(() => { if (!loading) { loadIdentities(); loadThreads() } }, [loading])
 
   async function openThread(t: Thread) {
-    const data = await api(`/api/emails/thread/${t.id}`)
-    setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
-  }
+  const data = await api(`/api/emails/thread/${t.id}`)
+  setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
+  // Mark as read in local state
+  setThreads(prev => prev.map(th => th.id === t.id ? { ...th, read: true } : th))
+}
 
   async function sendEmail() {
     if (!composeTo || !composeSubject || !composeText || !composeIdentityId) return
