@@ -22,15 +22,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') return res.json(page)
 
   if (req.method === 'PUT') {
-    const body = req.body
+    const { slug, title, tagline, description, logoUrl, accentColor, bgStyle, fontStyle, customDomain, storeId, waitlistId, identityId, links, sections, active } = req.body
     const updated = await prisma.brandPage.update({
       where: { id: String(id) },
       data: {
-        ...body,
-        storeId: body.storeId || null,
-        waitlistId: body.waitlistId || null,
-        identityId: body.identityId || null,
-        customDomain: body.customDomain || null,
+        slug, title, tagline, description,
+        logoUrl: logoUrl || null,
+        accentColor, bgStyle, fontStyle,
+        customDomain: customDomain || null,
+        storeId: storeId || null,
+        waitlistId: waitlistId || null,
+        identityId: identityId || null,
+        links: links || [],
+        sections: sections || [],
+        active,
       },
     })
     return res.json(updated)
