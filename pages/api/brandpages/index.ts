@@ -18,6 +18,18 @@ const CreateSchema = z.object({
   waitlistId: z.string().optional(),
   links: z.array(z.object({ label: z.string(), url: z.string() })).default([]),
   sections: z.array(z.object({ title: z.string(), content: z.string() })).default([]),
+  template: z.string().default('1'),
+  heroImage: z.string().optional(),
+  headlineLine1: z.string().optional(),
+  headlineLine2: z.string().optional(),
+  badgeText: z.string().optional(),
+  ctaText: z.string().optional(),
+  featuresHeadline: z.string().optional(),
+  features: z.array(z.any()).default([]),
+  stats: z.array(z.any()).default([]),
+  aboutHeadline: z.string().optional(),
+  contactHeadline: z.string().optional(),
+  contactSub: z.string().optional(),
 })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
