@@ -173,7 +173,7 @@ export default function StoresPage() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
                 <div>
                   <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, letterSpacing: -0.5, marginBottom: 4 }}>{selected.name}</div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333' }}>// {selected._count.products} products · {selected._count.orders} orders</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333' }}>// {selected._count?.products ?? 0} products · {selected._count?.orders ?? 0} orders</div>
                 </div>
                 <button onClick={() => deleteStore(selected.id)} style={{ ...ghostBtn, color: '#ff6b6b', borderColor: 'rgba(255,107,107,0.2)', fontSize: 12 }}>Delete</button>
               </div>
