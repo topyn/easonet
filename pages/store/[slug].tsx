@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 
-declare global { interface Window { paypal: any } }
+declare global { interface Window { paypal: any; _easonetOrderId: string } }
 
 interface Product { id: string; name: string; description?: string; price: number; currency: string; type: string; imageUrl?: string; stock?: number }
 interface StoreInfo { id: string; name: string; slug: string; description?: string; products: Product[]; identity?: { name: string; color: string } | null }
