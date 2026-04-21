@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { authFetch, clearTokens } from '../lib/auth-client'
+function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '') }
 
 interface Store { id: string; name: string; slug: string; description?: string; active: boolean; _count: { products: number; orders: number }; identity?: { name: string; color: string } | null }
 interface Product { id: string; name: string; description?: string; price: number; currency: string; type: string; imageUrl?: string; fileUrl?: string; deliveryNote?: string; stock?: number; active: boolean }
