@@ -370,6 +370,11 @@ export default function App() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F87171', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>brand pages</div>
               </a>
+              <div style={{ margin: '8px 10px 4px', borderTop: '1px solid rgba(255,255,255,.05)' }} />
+              <a href={process.env.NEXT_PUBLIC_DISCORD_URL || '#'} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#5865F2', flexShrink: 0 }} />
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>community</div>
+              </a>
               <a href="/dns-check" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F5A623', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>dns checker</div>
