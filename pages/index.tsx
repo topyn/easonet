@@ -6,8 +6,8 @@ export default function Homepage() {
   return (
     <>
       <Head>
-        <title>Easonet — Built for founders who can't stop starting things</title>
-        <meta name="description" content="Every new brand has the same setup headaches. We're building the tools to eliminate them — one by one. Starting with multi-brand email." />
+        <title>Easonet — The operating system for multi-brand founders</title>
+        <meta name="description" content="Email, brand pages, online stores, waitlists — everything a new brand needs to go from idea to live in minutes. One subscription, unlimited brands." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
@@ -152,7 +152,7 @@ export default function Homepage() {
       <section className="hero">
         <div className="hero-badge">Platform · Now in beta</div>
         <h1>Built for founders who<br /><em>can't stop</em> starting things</h1>
-        <p className="hero-sub">The email tool built for founders who run more than one thing. Send from any domain, read everything in one inbox — before you even launch.</p>
+        <p className="hero-sub">Email, brand pages, online stores, waitlists — everything a new brand needs, all in one place. Add a new brand in minutes, not days.</p>
         <div className="hero-actions">
           <a href="/login"><button className="btn-hero">Start free — 30 days</button></a>
           <a href="#problem"><button className="btn-hero-ghost">See how it works →</button></a>
@@ -162,22 +162,22 @@ export default function Homepage() {
             <div className="terminal-dot" style={{background:'#FF5F57'}}></div>
             <div className="terminal-dot" style={{background:'#FEBC2E'}}></div>
             <div className="terminal-dot" style={{background:'#28C840'}}></div>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:'#444',marginLeft:8}}>easonet — brand dashboard</span>
           </div>
           <div className="terminal-body">
-            <div><span className="t-dim">$</span> <span className="t-accent">easonet</span> <span className="t-white">send</span></div>
-            <div className="t-dim">  ↳ from <span className="t-muted">mark@easonet.com</span></div>
-            <div className="t-dim">  ↳ to   <span className="t-muted">john@stuff.com</span></div>
-            <div className="t-dim">  ↳ subj <span className="t-muted">"Partnership proposal"</span></div>
+            <div><span className="t-dim">$</span> <span className="t-accent">easonet</span> <span className="t-white">brands</span></div>
             <div>&nbsp;</div>
-            <div><span className="t-green">✓</span> <span className="t-muted">Sent from</span> <span className="t-white">mark@easonet.com</span></div>
-            <div><span className="t-green">✓</span> <span className="t-muted">Reply routes to</span> <span className="t-white">your single inbox</span></div>
-            <div><span className="t-green">✓</span> <span className="t-muted">No separate mailbox needed</span></div>
+            <div className="t-dim">  ezcoaster.com</div>
+            <div className="t-dim">    ✉ <span className="t-muted">mark@ezcoaster.com</span>         <span className="t-green">● email live</span></div>
+            <div className="t-dim">    ◈ <span className="t-muted">ezcoaster.com</span>              <span className="t-green">● brand page live</span></div>
+            <div className="t-dim">    ◻ <span className="t-muted">3 products</span>                 <span className="t-green">● store live</span></div>
+            <div className="t-dim">    ○ <span className="t-muted">142 signups</span>               <span className="t-green">● waitlist live</span></div>
             <div>&nbsp;</div>
-            <div><span className="t-dim">$</span> <span className="t-accent">easonet</span> <span className="t-white">identities</span></div>
-            <div className="t-dim">  mark@easonet.com          <span className="t-green">● live</span></div>
-            <div className="t-dim">  mark@topyn.com            <span className="t-green">● live</span></div>
-            <div className="t-dim">  hello@topyn.com           <span className="t-green">● live</span></div>
-            <div className="t-dim">  support@easonet.com       <span className="t-amber">○ dns pending</span></div>
+            <div className="t-dim">  topyn.com</div>
+            <div className="t-dim">    ✉ <span className="t-muted">mark@topyn.com</span>             <span className="t-green">● email live</span></div>
+            <div className="t-dim">    ◈ <span className="t-muted">topyn.com</span>                  <span className="t-amber">○ page draft</span></div>
+            <div>&nbsp;</div>
+            <div><span className="t-green">✓</span> <span className="t-muted">2 brands. 1 dashboard. 0 headaches.</span></div>
           </div>
         </div>
       </section>
@@ -187,12 +187,12 @@ export default function Homepage() {
         <div style={{maxWidth:'1400px',margin:'0 auto',padding:'0 80px'}}>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1px',background:'rgba(255,255,255,0.08)'}}>
             <div style={{padding:'60px 48px',background:'#080808'}}>
-              <div style={{fontFamily:"'DM Mono', monospace",fontSize:11,color:'#333',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:24}}>// the problem</div>
+              <div style={{fontFamily:"'DM Mono', monospace",fontSize:11,color:'#333',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:24}}>// the old way</div>
               <div style={{display:'flex',flexDirection:'column',gap:20}}>
                 {[
-                  { icon: '✗', text: "You registered 3 domains last month. Now you need professional email for each one — but setting up a mailbox per domain is slow, expensive, and means logging into multiple accounts all day." },
-                  { icon: '✗', text: "You're in idea validation mode. You don't want to pay for Google Workspace for a project that might not go anywhere. But using Gmail looks unprofessional to potential customers and partners." },
-                  { icon: '✗', text: "A reply to your client pitch went to the wrong inbox. A supplier email got missed for a week. Managing multiple brands across multiple inboxes is a full-time job." },
+                  { icon: '✗', text: "You registered a new domain. Now you need email, a landing page, a way to take orders, and a waitlist — all from different providers, all with separate logins and monthly bills." },
+                  { icon: '✗', text: "Your brand page lives on Squarespace. Your email is on Google Workspace. Your store is on Shopify. Your waitlist is on Mailchimp. You spend more time managing tools than building." },
+                  { icon: '✗', text: "A new idea comes to you. By the time you've set everything up across six different platforms, the momentum is gone. Most ideas die in the setup, not the execution." },
                 ].map((item, i) => (
                   <div key={i} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
                     <div style={{fontFamily:"'DM Mono', monospace",fontSize:13,color:'#ff6b6b',marginTop:2,flexShrink:0}}>{item.icon}</div>
@@ -205,9 +205,9 @@ export default function Homepage() {
               <div style={{fontFamily:"'DM Mono', monospace",fontSize:11,color:'#7B6EF6',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:24}}>// the easonet way</div>
               <div style={{display:'flex',flexDirection:'column',gap:20}}>
                 {[
-                  { icon: '✓', text: "Add any email address on any domain you own. Two DNS records, five minutes, and you're sending professional email from that identity." },
-                  { icon: '✓', text: "All your brands live in one inbox. Emails are tagged by identity so you always know which business a conversation belongs to. No switching, no confusion." },
-                  { icon: '✓', text: "Test new ideas without commitment. Spin up a new brand identity in minutes, validate before you invest. If the idea doesn't fly, just remove it." },
+                  { icon: '✓', text: "New domain. Add it to easonet. Get professional email, a branded page live at your domain, a store with PayPal checkout, and a waitlist — all in one place, in under 10 minutes." },
+                  { icon: '✓', text: "One dashboard, every brand. Email threads, orders, waitlist signups, and brand pages all in one place. No tab switching, no tool juggling, no missed messages." },
+                  { icon: '✓', text: "Launch fast, iterate faster. A new idea goes from domain registration to a live branded presence with email and a working store in minutes. Speed is the whole point." },
                 ].map((item, i) => (
                   <div key={i} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
                     <div style={{fontFamily:"'DM Mono', monospace",fontSize:13,color:'#3ECF8E',marginTop:2,flexShrink:0}}>{item.icon}</div>
