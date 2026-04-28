@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import dynamic from 'next/dynamic'
+const OnboardingWizard = dynamic(() => import('../components/OnboardingWizard'), { ssr: false })
 import { authFetch, getToken, clearTokens, setTokens } from '../lib/auth-client'
 
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
@@ -174,6 +176,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [identities, setIdentities] = useState<Identity[]>([])
+  const [showWizard, setShowWizard] = useState(false)
   const [threads, setThreads] = useState<Thread[]>([])
   const [activeIdentityId, setActiveIdentityId] = useState<string | null>(null)
   const [activeThread, setActiveThread] = useState<Thread | null>(null)
@@ -592,6 +595,16 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+      {showWizard && (
+        <OnboardingWizard
+          authFetch={authFetch}
+          onCancel={() => setShowWizard(false)}
+          onComplete={async () => {
+            setShowWizard(false)
+            await loadIdentities()
+          }}
+        />
       )}
     </>
   )
