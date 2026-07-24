@@ -206,6 +206,7 @@ export default function App() {
   const [activeThread, setActiveThread] = useState<Thread | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [threadActionBusy, setThreadActionBusy] = useState(false)
+  const [replyCc, setReplyCc] = useState('')
   const [wizardIdentity, setWizardIdentity] = useState<Identity | null>(null)
   const [composing, setComposing] = useState(false)
   const [addingIdentity, setAddingIdentity] = useState(false)
@@ -292,7 +293,10 @@ export default function App() {
   async function openThread(t: Thread) {
     setReplyError('')
     const data = await api(`/api/emails/thread/${t.id}`)
-    setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
+    const thread: Thread = data.id ? data : { ...t, messages: t.messages ?? [] }
+    setActiveThread(thread)
+    const others = thread.participants.filter(p => p !== thread.identity.email)
+    setReplyCc(others.slice(1).join(', '))
   }
 
   async function setThreadArchived(threadId: string, archived: boolean) {
@@ -647,6 +651,15 @@ export default function App() {
                       {replyError && (
                         <div style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 7, color: '#ff6b6b', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{replyError}</div>
                       )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', flexShrink: 0 }}>cc</span>
+                        <input
+                          value={replyCc}
+                          onChange={e => setReplyCc(e.target.value)}
+                          placeholder="cc@example.com"
+                          style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 6, padding: '5px 10px', fontSize: 12, color: TEXT, outline: 'none', fontFamily: "'DM Sans', sans-serif" }}
+                        />
+                      </div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         <textarea
                           id="quick-reply"
@@ -661,11 +674,10 @@ export default function App() {
                             try {
                               const others = activeThread.participants.filter(p => p !== activeThread.identity.email)
                               const replyTo = others[0] ?? activeThread.participants[0]
-                              const replyCc = others.slice(1)
                               const res = await post('/api/emails/send', {
                                 identityId: activeThread.identity.id,
                                 to: replyTo,
-                                cc: replyCc.length ? replyCc.join(', ') : undefined,
+                                cc: replyCc || undefined,
                                 subject: `Re: ${activeThread.subject}`,
                                 text: el.value,
                                 threadId: activeThread.id,

@@ -124,7 +124,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         include: { messages: true },
       })
     } else {
-      await prisma.thread.update({ where: { id: thread.id }, data: { lastAt: new Date() } })
+      // Merge in anyone newly added to To/Cc so a manually-added cc recipient
+      // stays part of the conversation on later replies, not just this one message.
+      const mergedParticipants = Array.from(new Set([...thread.participants, ...toList, ...ccList]))
+      thread = await prisma.thread.update({
+        where: { id: thread.id },
+        data: { lastAt: new Date(), participants: mergedParticipants },
+        include: { messages: { orderBy: { createdAt: 'asc' } } },
+      })
     }
 
     const message = await prisma.message.create({
