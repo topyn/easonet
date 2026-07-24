@@ -6,7 +6,7 @@ const OnboardingWizard = dynamic(() => import('../components/OnboardingWizard'),
 import { authFetch, getToken, clearTokens, setTokens } from '../lib/auth-client'
 
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
-interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean }
+interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean; signature?: string | null }
 interface AttachmentMeta { id: string; filename: string; mimeType: string; size: number }
 interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; _count?: { attachments: number } }
 interface StagedAttachment { path?: string; attachmentId?: string; filename: string; mimeType: string; size: number }
@@ -207,6 +207,9 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false)
   const [threadActionBusy, setThreadActionBusy] = useState(false)
   const [replyCc, setReplyCc] = useState('')
+  const [editingSignatureIdentity, setEditingSignatureIdentity] = useState<Identity | null>(null)
+  const [signatureDraft, setSignatureDraft] = useState('')
+  const [signatureSaving, setSignatureSaving] = useState(false)
   const [wizardIdentity, setWizardIdentity] = useState<Identity | null>(null)
   const [composing, setComposing] = useState(false)
   const [addingIdentity, setAddingIdentity] = useState(false)
@@ -334,6 +337,27 @@ export default function App() {
     setComposeAttachments((m.attachments ?? []).map(a => ({ attachmentId: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })))
     setComposeError('')
     setComposing(true)
+  }
+
+  function openCompose() {
+    const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
+    if (identity?.signature) setComposeText(`\n\n-- \n${identity.signature}`)
+    setComposing(true)
+  }
+
+  async function saveSignature() {
+    if (!editingSignatureIdentity) return
+    setSignatureSaving(true)
+    try {
+      const res = await patch(`/api/identities/${editingSignatureIdentity.id}`, { signature: signatureDraft || null })
+      if (res.ok) {
+        const updated = await res.json()
+        setIdentities(prev => prev.map(i => i.id === updated.id ? { ...i, signature: updated.signature } : i))
+        setEditingSignatureIdentity(null)
+      }
+    } finally {
+      setSignatureSaving(false)
+    }
   }
 
   async function stageAttachments(files: FileList | null) {
@@ -507,6 +531,11 @@ export default function App() {
                       <div style={{ fontSize: 12, color: TEXT, fontWeight: activeIdentityId === id.id ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{id.name}</div>
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{id.email}</div>
                     </div>
+                    <button
+                      title="Edit signature"
+                      onClick={e => { e.stopPropagation(); setEditingSignatureIdentity(id); setSignatureDraft(id.signature ?? '') }}
+                      style={{ border: 'none', background: 'none', color: '#333', cursor: 'pointer', fontSize: 11, padding: '2px 4px', flexShrink: 0 }}
+                    >✎</button>
                     {!id.dnsVerified && (
                       <div
                         title="DNS not verified"
@@ -596,7 +625,7 @@ export default function App() {
                     />
                   )}
                   <button onClick={loadThreads} style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>↻</button>
-                  <button onClick={() => setComposing(true)} style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
+                  <button onClick={openCompose} style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
                 </div>
 
                 {/* Thread detail */}
@@ -865,6 +894,29 @@ export default function App() {
                 Add identity →
               </button>
               <button onClick={() => setAddingIdentity(false)} style={{ padding: '10px 16px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Signature editor modal */}
+      {editingSignatureIdentity && (
+        <div onClick={e => e.target === e.currentTarget && setEditingSignatureIdentity(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
+          <div style={{ background: BG2, border: `1px solid ${BORDER2}`, borderRadius: 14, padding: 32, width: 420, display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, letterSpacing: -0.5, color: TEXT, marginBottom: 6 }}>Signature</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333' }}>// appended to new messages from {editingSignatureIdentity.email}</div>
+            </div>
+            <textarea
+              value={signatureDraft}
+              onChange={e => setSignatureDraft(e.target.value)}
+              placeholder={`${editingSignatureIdentity.name}\n${editingSignatureIdentity.email}`}
+              style={{ ...inputStyle, minHeight: 100, resize: 'vertical', fontFamily: "'DM Mono', monospace" }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={saveSignature} disabled={signatureSaving} style={{ padding: '10px 24px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: signatureSaving ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                {signatureSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditingSignatureIdentity(null)} style={{ padding: '10px 16px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
             </div>
           </div>
         </div>

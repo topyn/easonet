@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         orderBy: { createdAt: 'asc' },
         select: {
           id: true, name: true, email: true,
-          domain: true, color: true, dnsVerified: true, createdAt: true,
+          domain: true, color: true, dnsVerified: true, signature: true, createdAt: true,
         },
       })
       return res.json(identities)
@@ -78,6 +78,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (err: any) {
     console.error('IDENTITIES ERROR:', err.message)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Failed to load identities' })
   }
 }

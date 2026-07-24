@@ -32,6 +32,7 @@ model Identity {
   email        String    @unique
   domain       String
   color        String    @default("#534AB7")
+  signature    String?   @db.Text
   dnsVerified  Boolean   @default(false)
   smtpHost     String
   smtpPort     Int       @default(587)
