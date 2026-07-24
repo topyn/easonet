@@ -54,6 +54,7 @@ model Thread {
   identity     Identity  @relation(fields: [identityId], references: [id])
   participants String[]
   read         Boolean   @default(false)
+  status       String    @default("open") // open | archived
   lastAt       DateTime  @default(now())
   createdAt    DateTime  @default(now())
   messages     Message[]

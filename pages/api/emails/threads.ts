@@ -16,10 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const dbUser = await prisma.user.findUnique({ where: { supabaseId: authUser.id } })
   if (!dbUser) return res.status(404).json({ error: 'User not found' })
 
-  const { identityId, cursor, q } = req.query
+  const { identityId, cursor, q, status } = req.query
 
   const where = {
     userId: dbUser.id,
+    status: status === 'archived' ? 'archived' : 'open',
     ...(identityId ? { identityId: String(identityId) } : {}),
     ...(q ? {
       OR: [

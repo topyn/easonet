@@ -10,7 +10,7 @@ interface Identity { id: string; name: string; email: string; domain: string; co
 interface AttachmentMeta { id: string; filename: string; mimeType: string; size: number }
 interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; _count?: { attachments: number } }
 interface StagedAttachment { path: string; filename: string; mimeType: string; size: number }
-interface Thread { id: string; subject: string; lastAt: string; read: boolean; participants: string[]; identity: Identity; messages: Message[] }
+interface Thread { id: string; subject: string; lastAt: string; read: boolean; status: string; participants: string[]; identity: Identity; messages: Message[] }
 interface DnsResult { mx: boolean; spf: boolean }
 
 const COLORS = ['#7B6EF6','#3ECF8E','#F5A623','#60A5FA','#F87171','#A78BFA','#34D399']
@@ -26,6 +26,7 @@ const ACCENT = '#7B6EF6'
 
 function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
+function patch(url: string, body: object) { return authFetch(url, { method: 'PATCH', body: JSON.stringify(body) }) }
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
@@ -199,6 +200,8 @@ export default function App() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [activeIdentityId, setActiveIdentityId] = useState<string | null>(null)
   const [activeThread, setActiveThread] = useState<Thread | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const [threadActionBusy, setThreadActionBusy] = useState(false)
   const [wizardIdentity, setWizardIdentity] = useState<Identity | null>(null)
   const [composing, setComposing] = useState(false)
   const [addingIdentity, setAddingIdentity] = useState(false)
@@ -253,9 +256,10 @@ export default function App() {
     if (activeIdentityId) params.set('identityId', activeIdentityId)
     if (search) params.set('q', search)
     if (cursor) params.set('cursor', cursor)
+    if (showArchived) params.set('status', 'archived')
     const qs = params.toString()
     return qs ? `/api/emails/threads?${qs}` : '/api/emails/threads'
-  }, [activeIdentityId, search])
+  }, [activeIdentityId, search, showArchived])
 
   const loadThreads = useCallback(async () => {
     const data = await api(threadsUrl())
@@ -273,7 +277,7 @@ export default function App() {
   }, [threadsUrl, nextCursor, loadingMore])
 
   useEffect(() => { if (!loading) loadIdentities() }, [loading])
-  useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search])
+  useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search, showArchived])
 
   // Debounce the search box into `search`
   useEffect(() => {
@@ -285,6 +289,28 @@ export default function App() {
     setReplyError('')
     const data = await api(`/api/emails/thread/${t.id}`)
     setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
+  }
+
+  async function setThreadArchived(threadId: string, archived: boolean) {
+    setThreadActionBusy(true)
+    try {
+      await patch(`/api/emails/thread/${threadId}`, { status: archived ? 'archived' : 'open' })
+      setActiveThread(null)
+      await loadThreads()
+    } finally {
+      setThreadActionBusy(false)
+    }
+  }
+
+  async function markThreadUnread(threadId: string) {
+    setThreadActionBusy(true)
+    try {
+      await patch(`/api/emails/thread/${threadId}`, { read: false })
+      setActiveThread(null)
+      await loadThreads()
+    } finally {
+      setThreadActionBusy(false)
+    }
   }
 
   async function stageAttachments(files: FileList | null) {
@@ -424,21 +450,30 @@ export default function App() {
 
                 {/* All inboxes */}
                 <div
-                  onClick={() => { setActiveIdentityId(null); setActiveThread(null) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId && !showArchived ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId && !showArchived ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444', flexShrink: 0 }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 12, color: !activeIdentityId ? TEXT : MUTED, fontWeight: !activeIdentityId ? 500 : 400 }}>All inboxes</div>
+                    <div style={{ fontSize: 12, color: !activeIdentityId && !showArchived ? TEXT : MUTED, fontWeight: !activeIdentityId && !showArchived ? 500 : 400 }}>All inboxes</div>
                     {unreadCount > 0 && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT }}>{unreadCount} unread</div>}
                   </div>
+                </div>
+
+                {/* Archived */}
+                <div
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(true) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: showArchived ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: showArchived ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                >
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#555', flexShrink: 0 }} />
+                  <div style={{ fontSize: 12, color: showArchived ? TEXT : MUTED, fontWeight: showArchived ? 500 : 400 }}>Archived</div>
                 </div>
 
                 {identities.map(id => (
                   <div
                     key={id.id}
-                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null); setShowArchived(false) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !showArchived && activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !showArchived && activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
                   >
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: id.color, flexShrink: 0 }} />
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -522,7 +557,7 @@ export default function App() {
                 <div style={{ display: 'flex', alignItems: 'center', padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, gap: 10, flexShrink: 0 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: -0.5, color: TEXT }}>
-                      {activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
+                      {showArchived ? 'Archived' : activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
                     </div>
                   </div>
                   {!activeThread && (
@@ -544,6 +579,16 @@ export default function App() {
                       <button onClick={() => setActiveThread(null)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: ACCENT, border: 'none', background: 'none', cursor: 'pointer' }}>← back</button>
                       <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: -0.3, flex: 1 }}>{activeThread.subject}</span>
                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: activeThread.identity?.color, padding: '3px 10px', border: `1px solid ${activeThread.identity?.color}33`, borderRadius: 100 }}>{activeThread.identity?.name}</span>
+                      <button
+                        onClick={() => markThreadUnread(activeThread.id)}
+                        disabled={threadActionBusy}
+                        style={{ padding: '5px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 11, cursor: threadActionBusy ? 'not-allowed' : 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}
+                      >Mark unread</button>
+                      <button
+                        onClick={() => setThreadArchived(activeThread.id, activeThread.status !== 'archived')}
+                        disabled={threadActionBusy}
+                        style={{ padding: '5px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 11, cursor: threadActionBusy ? 'not-allowed' : 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}
+                      >{activeThread.status === 'archived' ? 'Unarchive' : 'Archive'}</button>
                     </div>
                     <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {(activeThread.messages ?? []).map(m => (
