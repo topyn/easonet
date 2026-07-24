@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
+import { rateLimit, clientIp } from '../../../lib/rateLimit'
 import { z } from 'zod'
 
 const JoinSchema = z.object({
@@ -15,6 +16,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (!rateLimit(`waitlist-join:${clientIp(req)}`, 10, 10 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many requests — please wait a few minutes and try again' })
+  }
 
   const parsed = JoinSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: 'Invalid input' })

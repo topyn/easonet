@@ -1,11 +1,19 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { timingSafeEqual } from 'crypto'
 import { prisma } from '../../../lib/prisma'
 import { sendFromIdentity } from '../../../lib/mailer'
 
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB)
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Protect with a secret so only Vercel cron or manual trigger can call it
-  const secret = req.headers['x-cron-secret'] || req.query.secret
-  if (secret !== process.env.CRON_SECRET) {
+  const secretHeader = req.headers['x-cron-secret']
+  const secret = (typeof secretHeader === 'string' ? secretHeader : undefined) ?? (typeof req.query.secret === 'string' ? req.query.secret : undefined) ?? ''
+  if (!process.env.CRON_SECRET || !safeEqual(secret, process.env.CRON_SECRET)) {
     return res.status(401).json({ error: 'Unauthorised' })
   }
 
@@ -193,6 +201,6 @@ Open dashboard: https://easonet.com/app`
     })
   } catch (err: any) {
     console.error('DIGEST ERROR:', err.message)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Failed to send digest' })
   }
 }

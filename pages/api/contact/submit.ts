@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { sendFromIdentity } from '../../../lib/mailer'
+import { rateLimit, clientIp } from '../../../lib/rateLimit'
 import { z } from 'zod'
 
 const ContactSchema = z.object({
@@ -13,6 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).end()
 
   res.setHeader('Access-Control-Allow-Origin', '*')
+
+  if (!rateLimit(`contact:${clientIp(req)}`, 5, 10 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many messages — please wait a few minutes and try again' })
+  }
 
   const parsed = ContactSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: 'Please fill in all fields correctly' })

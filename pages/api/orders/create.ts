@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
+import { getPayPalToken, PAYPAL_BASE_URL } from '../../../lib/paypal'
+import { rateLimit, clientIp } from '../../../lib/rateLimit'
 import { z } from 'zod'
 
 const CreateSchema = z.object({
@@ -9,19 +11,6 @@ const CreateSchema = z.object({
   buyerEmail: z.string().email(),
   buyerAddress: z.string().optional(),
 })
-
-async function getPayPalToken() {
-  const res = await fetch('https://api-m.sandbox.paypal.com/v1/oauth2/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString('base64')}`,
-    },
-    body: 'grant_type=client_credentials',
-  })
-  const data = await res.json()
-  return data.access_token
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'OPTIONS') {
@@ -33,6 +22,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).end()
 
   res.setHeader('Access-Control-Allow-Origin', '*')
+
+  if (!rateLimit(`orders-create:${clientIp(req)}`, 20, 10 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many requests — please wait a few minutes and try again' })
+  }
 
   const parsed = CreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -49,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const token = await getPayPalToken()
-    const ppRes = await fetch('https://api-m.sandbox.paypal.com/v2/checkout/orders', {
+    const ppRes = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({

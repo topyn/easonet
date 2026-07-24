@@ -33,6 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     const existing = await prisma.store.findUnique({ where: { slug: parsed.data.slug } })
     if (existing) return res.status(400).json({ error: 'That URL slug is already taken' })
+    if (parsed.data.identityId) {
+      const owned = await prisma.identity.findFirst({ where: { id: parsed.data.identityId, userId: dbUser.id } })
+      if (!owned) return res.status(403).json({ error: 'Invalid identity' })
+    }
     const store = await prisma.store.create({
       data: { ...parsed.data, userId: dbUser.id },
     })

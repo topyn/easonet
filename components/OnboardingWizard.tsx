@@ -40,7 +40,7 @@ export default function OnboardingWizard({ onComplete, onCancel, authFetch }: Wi
     if (!domain) return
     setDetecting(true); setError('')
     try {
-      const res = await fetch(`/api/identities/detect-dns?domain=${encodeURIComponent(domain)}`)
+      const res = await authFetch(`/api/identities/detect-dns?domain=${encodeURIComponent(domain)}`)
       const data = await res.json()
       setProvider(data.provider || 'other')
       setIsOnCloudflare(data.isOnCloudflare)
@@ -54,7 +54,7 @@ export default function OnboardingWizard({ onComplete, onCancel, authFetch }: Wi
   const checkDns = useCallback(async () => {
     setChecking(true)
     try {
-      const res = await fetch(`/api/identities/detect-dns?domain=${encodeURIComponent(domain)}`)
+      const res = await authFetch(`/api/identities/detect-dns?domain=${encodeURIComponent(domain)}`)
       const data = await res.json()
       setDnsSteps(data.steps || { mx: false, spf: false, dkim: false })
       if (data.allDone) { setPolling(false); setStep('details') }

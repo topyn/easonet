@@ -1,28 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { sendFromIdentity } from '../../../lib/mailer'
+import { escapeHtml } from '../../../lib/html'
+import { getPayPalToken, PAYPAL_BASE_URL } from '../../../lib/paypal'
 import { z } from 'zod'
 
 const CaptureSchema = z.object({
   orderId: z.string(),
   paypalOrderId: z.string(),
 })
-
-async function getPayPalToken() {
-  const baseUrl = process.env.PAYPAL_SANDBOX === 'true'
-    ? 'https://api-m.sandbox.paypal.com'
-    : 'https://api-m.paypal.com'
-  const res = await fetch(`${baseUrl}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString('base64')}`,
-    },
-    body: 'grant_type=client_credentials',
-  })
-  const data = await res.json()
-  return data.access_token
-}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'OPTIONS') {
@@ -49,11 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!order) return res.status(404).json({ error: 'Order not found' })
 
   try {
-    const baseUrl = process.env.PAYPAL_SANDBOX === 'true'
-      ? 'https://api-m.sandbox.paypal.com'
-      : 'https://api-m.paypal.com'
     const token = await getPayPalToken()
-    const captureRes = await fetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}/capture`, {
+    const captureRes = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders/${paypalOrderId}/capture`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     })
@@ -90,14 +73,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       <table width="560" cellpadding="0" cellspacing="0" style="background:#101010;border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;">
         <tr><td style="padding:32px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
           <p style="margin:0;font-size:11px;color:#7B6EF6;letter-spacing:.1em;text-transform:uppercase;font-family:monospace;">// new order</p>
-          <h1 style="margin:12px 0 0;font-size:24px;font-weight:800;color:#f0f0ee;letter-spacing:-1px;">${order.store.name}</h1>
+          <h1 style="margin:12px 0 0;font-size:24px;font-weight:800;color:#f0f0ee;letter-spacing:-1px;">${escapeHtml(order.store.name)}</h1>
         </td></tr>
         <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="padding-bottom:16px;">
                 <p style="margin:0 0 4px;font-size:11px;color:#444;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;">Product</p>
-                <p style="margin:0;font-size:15px;color:#f0f0ee;font-weight:600;">${order.product.name}</p>
+                <p style="margin:0;font-size:15px;color:#f0f0ee;font-weight:600;">${escapeHtml(order.product.name)}</p>
               </td>
             </tr>
             <tr>
@@ -114,9 +97,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         </td></tr>
         <tr><td style="padding:28px 36px;border-bottom:1px solid rgba(255,255,255,0.06);">
           <p style="margin:0 0 12px;font-size:11px;color:#444;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;">Buyer</p>
-          <p style="margin:0 0 4px;font-size:15px;color:#f0f0ee;font-weight:600;">${order.buyerName}</p>
-          <p style="margin:0;font-size:13px;color:#666;">${order.buyerEmail}</p>
-          ${order.buyerAddress ? `<p style="margin:8px 0 0;font-size:13px;color:#666;">${order.buyerAddress}</p>` : ''}
+          <p style="margin:0 0 4px;font-size:15px;color:#f0f0ee;font-weight:600;">${escapeHtml(order.buyerName)}</p>
+          <p style="margin:0;font-size:13px;color:#666;">${escapeHtml(order.buyerEmail)}</p>
+          ${order.buyerAddress ? `<p style="margin:8px 0 0;font-size:13px;color:#666;">${escapeHtml(order.buyerAddress)}</p>` : ''}
         </td></tr>
         <tr><td style="padding:20px 36px;">
           <p style="margin:0;font-size:12px;color:#333;font-family:monospace;">// powered by easonet</p>

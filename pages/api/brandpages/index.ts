@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { getUser } from '../../../lib/supabase-server'
+import { assertOwnedRefs } from '../../../lib/ownership'
 import { z } from 'zod'
 
 const CreateSchema = z.object({
@@ -52,6 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     const existing = await prisma.brandPage.findUnique({ where: { slug: parsed.data.slug } })
     if (existing) return res.status(400).json({ error: 'That slug is already taken' })
+    const refError = await assertOwnedRefs(dbUser.id, parsed.data)
+    if (refError) return res.status(403).json({ error: refError })
     const data = parsed.data
     const page = await prisma.brandPage.create({
       data: {

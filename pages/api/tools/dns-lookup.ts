@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import dns from 'dns'
 import { promisify } from 'util'
+import { rateLimit, clientIp } from '../../../lib/rateLimit'
 
 const resolveMx = promisify(dns.resolveMx)
 const resolveTxt = promisify(dns.resolveTxt)
@@ -15,6 +16,10 @@ interface Conflict { type: string; severity: 'error' | 'warning'; message: strin
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
+
+  if (!rateLimit(`dns-lookup:${clientIp(req)}`, 20, 5 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many lookups — please wait a few minutes and try again' })
+  }
 
   const { domain } = req.query
   if (!domain || typeof domain !== 'string') return res.status(400).json({ error: 'Domain required' })

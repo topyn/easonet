@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import dns from 'dns'
 import { promisify } from 'util'
+import { getUser } from '../../../lib/supabase-server'
+import { rateLimit } from '../../../lib/rateLimit'
 
 const resolveNs = promisify(dns.resolveNs)
 const resolveMx = promisify(dns.resolveMx)
@@ -23,6 +25,14 @@ function detectProvider(ns: string[]): string {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
+
+  const authUser = await getUser(req, res)
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated' })
+
+  if (!rateLimit(`detect-dns:${authUser.id}`, 30, 5 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many lookups — please wait a few minutes and try again' })
+  }
+
   const { domain } = req.query
   if (!domain) return res.status(400).json({ error: 'Domain required' })
 

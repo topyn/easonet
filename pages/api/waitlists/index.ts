@@ -37,6 +37,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const existing = await prisma.waitlist.findUnique({ where: { slug: parsed.data.slug } })
     if (existing) return res.status(400).json({ error: 'That URL slug is already taken — try another' })
 
+    if (parsed.data.identityId) {
+      const owned = await prisma.identity.findFirst({ where: { id: parsed.data.identityId, userId: dbUser.id } })
+      if (!owned) return res.status(403).json({ error: 'Invalid identity' })
+    }
+
     const waitlist = await prisma.waitlist.create({
       data: { ...parsed.data, userId: dbUser.id },
     })

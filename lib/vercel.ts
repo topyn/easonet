@@ -1,3 +1,25 @@
+import dns from 'dns'
+import { promisify } from 'util'
+
+const resolve4 = promisify(dns.resolve4)
+const resolveCname = promisify(dns.resolveCname)
+
+const VERCEL_A_RECORDS = ['76.76.21.21']
+
+// Require the domain's DNS to already point at Vercel before we ever claim it via the
+// API. Vercel only allows a domain on one project account-wide, so registering a
+// domain the caller doesn't actually control would let them occupy/deny that domain
+// slot for its real owner — this check is what stops that.
+export async function domainPointsAtVercel(domain: string): Promise<boolean> {
+  const [a, cname] = await Promise.all([
+    resolve4(domain).catch(() => [] as string[]),
+    resolveCname(domain).catch(() => [] as string[]),
+  ])
+  if (a.some(ip => VERCEL_A_RECORDS.includes(ip))) return true
+  if (cname.some(c => /vercel-dns\.com$|\.vercel\.app$/i.test(c))) return true
+  return false
+}
+
 export async function addDomainToVercel(domain: string): Promise<{ success: boolean; error?: string }> {
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID
