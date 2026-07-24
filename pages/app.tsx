@@ -261,6 +261,7 @@ export default function App() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [hasDraft, setHasDraft] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     try {
@@ -545,6 +546,23 @@ export default function App() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
         select option { background: ${BG2}; color: ${TEXT}; }
+        .app-hamburger { display: none; }
+        .app-sidebar-backdrop { display: none; }
+        @media (max-width: 768px) {
+          .app-sidebar {
+            position: fixed;
+            top: 0; bottom: 0; left: 0;
+            z-index: 40;
+            width: 260px !important;
+            transform: translateX(-100%);
+            transition: transform .2s ease;
+          }
+          .app-sidebar.open { transform: translateX(0); }
+          .app-hamburger { display: flex !important; }
+          .app-sidebar-backdrop.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 39; }
+          .app-compose-panel { width: 100vw !important; right: 0 !important; left: 0 !important; bottom: 0 !important; border-radius: 0 !important; max-height: 85vh; }
+          .app-search-input { width: 120px !important; }
+        }
       `}</style>
 
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'DM Sans', sans-serif", background: BG, color: TEXT, overflow: 'hidden' }}>
@@ -552,10 +570,12 @@ export default function App() {
         {/* Trial banner */}
         {user && <TrialBanner plan={user.plan} trialEndsAt={user.trialEndsAt} identityCount={identities.length} />}
 
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+
+          <div className={`app-sidebar-backdrop${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
           {/* Sidebar */}
-          <div style={{ width: 220, background: BG2, borderRight: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+          <div className={`app-sidebar${sidebarOpen ? ' open' : ''}`} style={{ width: 220, background: BG2, borderRight: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
             {/* Logo */}
             <div style={{ padding: '18px 20px 14px', borderBottom: `1px solid ${BORDER}` }}>
               <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 17, letterSpacing: -0.5, color: TEXT }}>
@@ -570,7 +590,7 @@ export default function App() {
 
                 {/* All inboxes */}
                 <div
-                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(false) }}
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(false); setSidebarOpen(false) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId && !showArchived ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId && !showArchived ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444', flexShrink: 0 }} />
@@ -582,7 +602,7 @@ export default function App() {
 
                 {/* Archived */}
                 <div
-                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(true) }}
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(true); setSidebarOpen(false) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: showArchived ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: showArchived ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#555', flexShrink: 0 }} />
@@ -592,7 +612,7 @@ export default function App() {
                 {identities.map(id => (
                   <div
                     key={id.id}
-                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null); setShowArchived(false) }}
+                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null); setShowArchived(false); setSidebarOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !showArchived && activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !showArchived && activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
                   >
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: id.color, flexShrink: 0 }} />
@@ -680,6 +700,11 @@ export default function App() {
               <>
                 {/* Toolbar */}
                 <div style={{ display: 'flex', alignItems: 'center', padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, gap: 10, flexShrink: 0 }}>
+                  <button
+                    className="app-hamburger"
+                    onClick={() => setSidebarOpen(true)}
+                    style={{ padding: '6px 10px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, flexShrink: 0 }}
+                  >☰</button>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: -0.5, color: TEXT }}>
                       {showArchived ? 'Archived' : activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
@@ -687,6 +712,7 @@ export default function App() {
                   </div>
                   {!activeThread && (
                     <input
+                      className="app-search-input"
                       value={searchInput}
                       onChange={e => setSearchInput(e.target.value)}
                       placeholder="search subject or address…"
@@ -862,7 +888,7 @@ export default function App() {
 
                 {/* Compose panel */}
                 {composing && (
-                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: 500, background: BG2, border: `1px solid ${BORDER2}`, borderRadius: '12px 12px 0 0', display: 'flex', flexDirection: 'column', zIndex: 10 }}>
+                  <div className="app-compose-panel" style={{ position: 'absolute', bottom: 0, right: 0, width: 500, background: BG2, border: `1px solid ${BORDER2}`, borderRadius: '12px 12px 0 0', display: 'flex', flexDirection: 'column', zIndex: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: `1px solid ${BORDER}`, background: BG3, borderRadius: '12px 12px 0 0' }}>
                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>// new message</span>
                       <button onClick={() => setComposing(false)} style={{ fontSize: 14, color: MUTED, border: 'none', background: 'none', cursor: 'pointer' }}>✕</button>
