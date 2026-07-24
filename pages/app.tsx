@@ -29,6 +29,33 @@ function post(url: string, body: object) { return authFetch(url, { method: 'POST
 function patch(url: string, body: object) { return authFetch(url, { method: 'PATCH', body: JSON.stringify(body) }) }
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const DRAFT_KEY = 'easonet_compose_draft'
+
+interface ComposeDraft {
+  identityId: string
+  to: string
+  cc: string
+  bcc: string
+  showCcBcc: boolean
+  subject: string
+  text: string
+  attachments: StagedAttachment[]
+}
+
+function loadDraft(): ComposeDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function saveDraft(draft: ComposeDraft) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch {}
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY) } catch {}
+}
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n}B`
@@ -233,6 +260,7 @@ export default function App() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const [hasDraft, setHasDraft] = useState(false)
 
   useEffect(() => {
     try {
@@ -286,6 +314,21 @@ export default function App() {
 
   useEffect(() => { if (!loading) loadIdentities() }, [loading])
   useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search, showArchived])
+
+  // Check for a leftover draft once on mount, so "Resume draft" can appear before compose is even opened
+  useEffect(() => { setHasDraft(!!loadDraft()) }, [])
+
+  // Autosave the compose panel's contents so closing the tab doesn't lose them
+  useEffect(() => {
+    if (!composing) return
+    const t = setTimeout(() => {
+      const isEmpty = !composeTo && !composeCc && !composeBcc && !composeSubject && !composeText && composeAttachments.length === 0
+      if (isEmpty) return
+      saveDraft({ identityId: composeIdentityId, to: composeTo, cc: composeCc, bcc: composeBcc, showCcBcc, subject: composeSubject, text: composeText, attachments: composeAttachments })
+      setHasDraft(true)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [composing, composeIdentityId, composeTo, composeCc, composeBcc, showCcBcc, composeSubject, composeText, composeAttachments])
 
   // Debounce the search box into `search`
   useEffect(() => {
@@ -343,6 +386,30 @@ export default function App() {
     const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
     if (identity?.signature) setComposeText(`\n\n-- \n${identity.signature}`)
     setComposing(true)
+  }
+
+  function resumeDraft() {
+    const draft = loadDraft()
+    if (!draft) return
+    setComposeIdentityId(draft.identityId)
+    setComposeTo(draft.to)
+    setComposeCc(draft.cc)
+    setComposeBcc(draft.bcc)
+    setShowCcBcc(draft.showCcBcc)
+    setComposeSubject(draft.subject)
+    setComposeText(draft.text)
+    setComposeAttachments(draft.attachments)
+    setComposeError('')
+    setComposing(true)
+  }
+
+  function discardCompose() {
+    setComposing(false)
+    setComposeError('')
+    setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false)
+    setComposeSubject(''); setComposeText(''); setComposeAttachments([])
+    clearDraft()
+    setHasDraft(false)
   }
 
   async function saveSignature() {
@@ -415,6 +482,8 @@ export default function App() {
       }
       setComposing(false)
       setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false); setComposeSubject(''); setComposeText(''); setComposeAttachments([])
+      clearDraft()
+      setHasDraft(false)
       loadThreads()
     } catch {
       setComposeError('Failed to send — check your connection and try again')
@@ -625,6 +694,9 @@ export default function App() {
                     />
                   )}
                   <button onClick={loadThreads} style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>↻</button>
+                  {hasDraft && !composing && (
+                    <button onClick={resumeDraft} title="Resume your saved draft" style={{ padding: '7px 14px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: ACCENT, fontFamily: "'DM Mono', monospace" }}>Resume draft</button>
+                  )}
                   <button onClick={openCompose} style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
                 </div>
 
@@ -845,7 +917,7 @@ export default function App() {
                       <button onClick={sendEmail} disabled={composeSending} style={{ padding: '8px 20px', background: composeSending ? '#333' : ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: composeSending ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
                         {composeSending ? 'Sending…' : 'Send →'}
                       </button>
-                      <button onClick={() => { setComposing(false); setComposeError('') }} style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
+                      <button onClick={discardCompose} style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
                       <input ref={attachmentInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => { stageAttachments(e.target.files); e.target.value = '' }} />
                       <button onClick={() => attachmentInputRef.current?.click()} disabled={attachmentUploading} title="Attach files" style={{ marginLeft: 'auto', padding: '8px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: attachmentUploading ? 'not-allowed' : 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>
                         {attachmentUploading ? '…' : '📎'}
