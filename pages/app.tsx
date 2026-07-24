@@ -337,6 +337,31 @@ export default function App() {
     return () => clearTimeout(t)
   }, [searchInput])
 
+  // Keyboard shortcuts: c = compose, / = focus search, Esc = close compose / back out of a thread
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+      if (e.key === 'Escape') {
+        if (composing) { setComposing(false); return }
+        if (activeThread) { setActiveThread(null); return }
+        return
+      }
+      if (isTyping) return
+      if (e.key === 'c' && !composing) {
+        e.preventDefault()
+        const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
+        if (identity?.signature) setComposeText(`\n\n-- \n${identity.signature}`)
+        setComposing(true)
+      } else if (e.key === '/') {
+        e.preventDefault()
+        document.getElementById('thread-search')?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [composing, activeThread, identities, composeIdentityId])
+
   async function openThread(t: Thread) {
     setReplyError('')
     const data = await api(`/api/emails/thread/${t.id}`)
@@ -712,10 +737,11 @@ export default function App() {
                   </div>
                   {!activeThread && (
                     <input
+                      id="thread-search"
                       className="app-search-input"
                       value={searchInput}
                       onChange={e => setSearchInput(e.target.value)}
-                      placeholder="search subject or address…"
+                      placeholder="search subject or address… ( / )"
                       style={{ width: 220, padding: '6px 12px', background: BG, border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, color: TEXT, outline: 'none', fontFamily: "'DM Mono', monospace" }}
                     />
                   )}
@@ -723,7 +749,7 @@ export default function App() {
                   {hasDraft && !composing && (
                     <button onClick={resumeDraft} title="Resume your saved draft" style={{ padding: '7px 14px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: ACCENT, fontFamily: "'DM Mono', monospace" }}>Resume draft</button>
                   )}
-                  <button onClick={openCompose} style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
+                  <button onClick={openCompose} title="Compose (c)" style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
                 </div>
 
                 {/* Thread detail */}
@@ -790,10 +816,12 @@ export default function App() {
                       <div style={{ display: 'flex', gap: 10 }}>
                         <textarea
                           id="quick-reply"
-                          placeholder="// quick reply…"
+                          placeholder="// quick reply… (⌘/Ctrl+Enter to send)"
                           style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', fontSize: 13, color: TEXT, resize: 'none', outline: 'none', height: 64, fontFamily: "'DM Sans', sans-serif" }}
+                          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.getElementById('quick-reply-send')?.click() } }}
                         />
                         <button
+                          id="quick-reply-send"
                           onClick={async () => {
                             const el = document.getElementById('quick-reply') as HTMLTextAreaElement
                             if (!el?.value) return
@@ -921,9 +949,10 @@ export default function App() {
                     <div style={{ padding: '12px 18px', flex: 1 }}>
                       <textarea
                         style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 13, resize: 'none', minHeight: 120, color: TEXT, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6 }}
-                        placeholder="Write your message…"
+                        placeholder="Write your message… (⌘/Ctrl+Enter to send)"
                         value={composeText}
                         onChange={e => setComposeText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendEmail() } if (e.key === 'Escape') { e.preventDefault(); setComposing(false) } }}
                       />
                     </div>
                     {composeAttachments.length > 0 && (
