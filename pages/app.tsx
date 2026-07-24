@@ -4,6 +4,26 @@ import Head from 'next/head'
 import dynamic from 'next/dynamic'
 const OnboardingWizard = dynamic(() => import('../components/OnboardingWizard'), { ssr: false })
 import { authFetch, getToken, clearTokens, setTokens } from '../lib/auth-client'
+import DOMPurify from 'dompurify'
+
+if (DOMPurify.isSupported) {
+  // Force external links to open safely instead of trusting whatever target/rel a message brought with it
+  DOMPurify.addHook('afterSanitizeAttributes', node => {
+    if (node.tagName === 'A') {
+      node.setAttribute('target', '_blank')
+      node.setAttribute('rel', 'noopener noreferrer')
+    }
+  })
+}
+
+const EMAIL_HTML_ALLOWED_TAGS = ['b', 'i', 'u', 'em', 'strong', 'a', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3']
+const EMAIL_HTML_ALLOWED_ATTR = ['href']
+
+// Inbound mail is fully untrusted; outbound is our own contentEditable output, which can still
+// carry pasted-in HTML from elsewhere - both get sanitized the same way before ever rendering.
+function sanitizeEmailHtml(html: string): string {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: EMAIL_HTML_ALLOWED_TAGS, ALLOWED_ATTR: EMAIL_HTML_ALLOWED_ATTR })
+}
 
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
 interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean; signature?: string | null }
@@ -65,6 +85,22 @@ function formatBytes(n: number) {
 
 function normalizeSubject(subject: string): string {
   return subject.replace(/^((re|fwd?):\s*)+/i, '').trim()
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// Derives the plain-text version nodemailer sends alongside the HTML body (multipart/alternative)
+function htmlToPlainText(html: string): string {
+  if (typeof document === 'undefined') return ''
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(div|p|li|h[1-6])>/gi, '\n')
+    .replace(/<li>/gi, '• ')
+  const el = document.createElement('div')
+  el.innerHTML = withBreaks
+  return (el.textContent || '').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -256,11 +292,13 @@ export default function App() {
   const [newEmail, setNewEmail] = useState('')
   const [newColor, setNewColor] = useState(COLORS[0])
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const composeBodyRef = useRef<HTMLDivElement>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [hasDraft, setHasDraft] = useState(false)
+  const [composeSyncToken, setComposeSyncToken] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
@@ -319,6 +357,12 @@ export default function App() {
   // Check for a leftover draft once on mount, so "Resume draft" can appear before compose is even opened
   useEffect(() => { setHasDraft(!!loadDraft()) }, [])
 
+  // The compose body is an uncontrolled contentEditable (a controlled one fights cursor position) -
+  // push composeText into the DOM only when the panel opens, not on every keystroke.
+  useEffect(() => {
+    if (composing && composeBodyRef.current) composeBodyRef.current.innerHTML = composeText
+  }, [composing, composeSyncToken])
+
   // Autosave the compose panel's contents so closing the tab doesn't lose them
   useEffect(() => {
     if (!composing) return
@@ -351,7 +395,8 @@ export default function App() {
       if (e.key === 'c' && !composing) {
         e.preventDefault()
         const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
-        if (identity?.signature) setComposeText(`\n\n-- \n${identity.signature}`)
+        setComposeText(identity?.signature ? `<br><br>-- <br>${escapeHtml(identity.signature).replace(/\n/g, '<br>')}` : '')
+        setComposeSyncToken(t => t + 1)
         setComposing(true)
       } else if (e.key === '/') {
         e.preventDefault()
@@ -395,7 +440,8 @@ export default function App() {
 
   function forwardMessage(m: Message) {
     if (!activeThread) return
-    const quoted = `\n\n---------- Forwarded message ----------\nFrom: ${m.fromAddress}\nDate: ${new Date(m.createdAt).toLocaleString()}\nSubject: ${activeThread.subject}\nTo: ${m.toAddress}${m.ccAddress ? `\nCc: ${m.ccAddress}` : ''}\n\n${m.bodyText}`
+    const quotedBody = m.bodyHtml ? sanitizeEmailHtml(m.bodyHtml) : escapeHtml(m.bodyText).replace(/\n/g, '<br>')
+    const quoted = `<br><br>---------- Forwarded message ----------<br>From: ${escapeHtml(m.fromAddress)}<br>Date: ${escapeHtml(new Date(m.createdAt).toLocaleString())}<br>Subject: ${escapeHtml(activeThread.subject)}<br>To: ${escapeHtml(m.toAddress)}${m.ccAddress ? `<br>Cc: ${escapeHtml(m.ccAddress)}` : ''}<br><br>${quotedBody}`
     setComposeIdentityId(activeThread.identity.id)
     setComposeTo('')
     setComposeCc('')
@@ -403,6 +449,7 @@ export default function App() {
     setShowCcBcc(false)
     setComposeSubject(`Fwd: ${normalizeSubject(activeThread.subject)}`)
     setComposeText(quoted)
+    setComposeSyncToken(t => t + 1)
     setComposeAttachments((m.attachments ?? []).map(a => ({ attachmentId: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })))
     setComposeError('')
     setComposing(true)
@@ -410,7 +457,8 @@ export default function App() {
 
   function openCompose() {
     const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
-    if (identity?.signature) setComposeText(`\n\n-- \n${identity.signature}`)
+    setComposeText(identity?.signature ? `<br><br>-- <br>${escapeHtml(identity.signature).replace(/\n/g, '<br>')}` : '')
+    setComposeSyncToken(t => t + 1)
     setComposing(true)
   }
 
@@ -424,6 +472,7 @@ export default function App() {
     setShowCcBcc(draft.showCcBcc)
     setComposeSubject(draft.subject)
     setComposeText(draft.text)
+    setComposeSyncToken(t => t + 1)
     setComposeAttachments(draft.attachments)
     setComposeError('')
     setComposing(true)
@@ -433,7 +482,7 @@ export default function App() {
     setComposing(false)
     setComposeError('')
     setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false)
-    setComposeSubject(''); setComposeText(''); setComposeAttachments([])
+    setComposeSubject(''); setComposeText(''); setComposeSyncToken(t => t + 1); setComposeAttachments([])
     clearDraft()
     setHasDraft(false)
   }
@@ -496,18 +545,19 @@ export default function App() {
   }
 
   async function sendEmail() {
-    if (!composeTo || !composeSubject || !composeText || !composeIdentityId) return
+    const plainText = htmlToPlainText(composeText)
+    if (!composeTo || !composeSubject || !plainText || !composeIdentityId) return
     setComposeSending(true)
     setComposeError('')
     try {
-      const res = await post('/api/emails/send', { identityId: composeIdentityId, to: composeTo, cc: composeCc || undefined, bcc: composeBcc || undefined, subject: composeSubject, text: composeText, attachments: composeAttachments })
+      const res = await post('/api/emails/send', { identityId: composeIdentityId, to: composeTo, cc: composeCc || undefined, bcc: composeBcc || undefined, subject: composeSubject, text: plainText, html: sanitizeEmailHtml(composeText), attachments: composeAttachments })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setComposeError(data.error ? JSON.stringify(data.error) : 'Failed to send — please try again')
         return
       }
       setComposing(false)
-      setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false); setComposeSubject(''); setComposeText(''); setComposeAttachments([])
+      setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false); setComposeSubject(''); setComposeText(''); setComposeSyncToken(t => t + 1); setComposeAttachments([])
       clearDraft()
       setHasDraft(false)
       loadThreads()
@@ -571,6 +621,9 @@ export default function App() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
         select option { background: ${BG2}; color: ${TEXT}; }
+        .rte-body:empty:before { content: attr(data-placeholder); color: #444; pointer-events: none; }
+        .rte-body a { color: inherit; text-decoration: underline; }
+        .rte-body ul, .rte-body ol { padding-left: 20px; }
         .app-hamburger { display: none; }
         .app-sidebar-backdrop { display: none; }
         @media (max-width: 768px) {
@@ -777,8 +830,10 @@ export default function App() {
                             {m.direction === 'outbound' ? `you (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}
                             {m.ccAddress && <> · cc: {m.ccAddress}</>}
                           </div>
-                          <div style={{ maxWidth: '70%', background: m.direction === 'outbound' ? ACCENT : BG3, color: TEXT, padding: '12px 16px', borderRadius: m.direction === 'outbound' ? '12px 12px 4px 12px' : '12px 12px 12px 4px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', border: m.direction === 'outbound' ? 'none' : `1px solid ${BORDER}` }}>
-                            {m.bodyText}
+                          <div style={{ maxWidth: '70%', background: m.direction === 'outbound' ? ACCENT : BG3, color: TEXT, padding: '12px 16px', borderRadius: m.direction === 'outbound' ? '12px 12px 4px 12px' : '12px 12px 12px 4px', fontSize: 14, lineHeight: 1.6, border: m.direction === 'outbound' ? 'none' : `1px solid ${BORDER}` }}>
+                            {m.bodyHtml
+                              ? <div className="rte-body" dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(m.bodyHtml) }} />
+                              : <div style={{ whiteSpace: 'pre-wrap' }}>{m.bodyText}</div>}
                           </div>
                           {(m.attachments ?? []).length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6, maxWidth: '70%' }}>
@@ -946,13 +1001,40 @@ export default function App() {
                         {f.content}
                       </div>
                     ))}
-                    <div style={{ padding: '12px 18px', flex: 1 }}>
-                      <textarea
-                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 13, resize: 'none', minHeight: 120, color: TEXT, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6 }}
-                        placeholder="Write your message… (⌘/Ctrl+Enter to send)"
-                        value={composeText}
-                        onChange={e => setComposeText(e.target.value)}
+                    <div style={{ display: 'flex', gap: 2, padding: '8px 18px 0' }}>
+                      {[
+                        { label: 'B', cmd: 'bold', style: { fontWeight: 700 } },
+                        { label: 'I', cmd: 'italic', style: { fontStyle: 'italic' as const } },
+                        { label: 'U', cmd: 'underline', style: { textDecoration: 'underline' as const } },
+                        { label: '•', cmd: 'insertUnorderedList', style: {} },
+                      ].map(b => (
+                        <button
+                          key={b.cmd}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { document.execCommand(b.cmd); composeBodyRef.current?.focus() }}
+                          style={{ width: 26, height: 26, border: `1px solid ${BORDER}`, borderRadius: 5, background: 'transparent', color: MUTED, cursor: 'pointer', fontSize: 12, ...b.style }}
+                        >{b.label}</button>
+                      ))}
+                      <button
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => {
+                          const url = window.prompt('Link URL (include https://)')
+                          if (url) document.execCommand('createLink', false, url)
+                          composeBodyRef.current?.focus()
+                        }}
+                        style={{ width: 26, height: 26, border: `1px solid ${BORDER}`, borderRadius: 5, background: 'transparent', color: MUTED, cursor: 'pointer', fontSize: 12 }}
+                      >🔗</button>
+                    </div>
+                    <div style={{ padding: '10px 18px', flex: 1 }}>
+                      <div
+                        ref={composeBodyRef}
+                        className="rte-body"
+                        contentEditable
+                        suppressContentEditableWarning
+                        data-placeholder="Write your message… (⌘/Ctrl+Enter to send)"
+                        onInput={e => setComposeText(e.currentTarget.innerHTML)}
                         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendEmail() } if (e.key === 'Escape') { e.preventDefault(); setComposing(false) } }}
+                        style={{ width: '100%', minHeight: 120, maxHeight: 300, overflowY: 'auto', fontSize: 13, color: TEXT, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6, outline: 'none' }}
                       />
                     </div>
                     {composeAttachments.length > 0 && (
