@@ -12,12 +12,15 @@ function parseEmailList(raw?: string): string[] {
   return raw.split(/[,;]/).map(s => s.trim()).filter(Boolean)
 }
 
+// A freshly-uploaded attachment carries `path`; a forwarded one carries `attachmentId`
+// so ownership is re-verified against the DB instead of trusting a client-supplied path.
 const AttachmentRefSchema = z.object({
-  path: z.string().min(1),
+  path: z.string().min(1).optional(),
+  attachmentId: z.string().min(1).optional(),
   filename: z.string().min(1),
   mimeType: z.string().min(1),
   size: z.number().int().positive(),
-})
+}).refine(a => !!a.path !== !!a.attachmentId, { message: 'Provide exactly one of path or attachmentId' })
 
 const SendSchema = z.object({
   identityId: z.string(),
@@ -62,15 +65,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const ccJoined = ccList.join(', ')
     const bccJoined = bccList.join(', ')
 
-    // Attachments must have been uploaded by this same user — reject anything else
-    // to stop a crafted request referencing (and thereby exfiltrating) another user's file.
-    if (attachments.some(a => !a.path.startsWith(`${dbUser.id}/`))) {
-      return res.status(403).json({ error: 'Invalid attachment reference' })
+    // Resolve each attachment to a verified storage path. Freshly-uploaded ones must
+    // live under this user's own upload prefix; forwarded ones are re-checked against
+    // the DB (the message they came from must belong to a thread this user owns) —
+    // either way we never trust a client-supplied path we haven't verified ownership of.
+    const resolvedAttachments: { filename: string; mimeType: string; size: number; storagePath: string }[] = []
+    for (const a of attachments) {
+      if (a.attachmentId) {
+        const existing = await prisma.attachment.findFirst({
+          where: { id: a.attachmentId },
+          include: { message: { include: { thread: true } } },
+        })
+        if (!existing || existing.message.thread.userId !== dbUser.id) {
+          return res.status(403).json({ error: 'Invalid attachment reference' })
+        }
+        resolvedAttachments.push({ filename: existing.filename, mimeType: existing.mimeType, size: existing.size, storagePath: existing.storagePath })
+      } else {
+        if (!a.path!.startsWith(`${dbUser.id}/`)) {
+          return res.status(403).json({ error: 'Invalid attachment reference' })
+        }
+        resolvedAttachments.push({ filename: a.filename, mimeType: a.mimeType, size: a.size, storagePath: a.path! })
+      }
     }
-    const mailAttachments = await Promise.all(attachments.map(async a => ({
+
+    const mailAttachments = await Promise.all(resolvedAttachments.map(async a => ({
       filename: a.filename,
       contentType: a.mimeType,
-      path: await signAttachmentUrl(req, res, a.path, 300),
+      path: await signAttachmentUrl(req, res, a.storagePath, 300),
     })))
 
     let inReplyTo: string | undefined
@@ -122,14 +143,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     })
 
-    if (attachments.length > 0) {
+    if (resolvedAttachments.length > 0) {
       await prisma.attachment.createMany({
-        data: attachments.map(a => ({
+        data: resolvedAttachments.map(a => ({
           messageId: message.id,
           filename: a.filename,
           mimeType: a.mimeType,
           size: a.size,
-          storagePath: a.path,
+          storagePath: a.storagePath,
         })),
       })
     }
@@ -138,6 +159,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (err: any) {
     console.error('SEND ERROR:', err.message)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: 'Failed to send email' })
   }
 }

@@ -7,6 +7,10 @@ import { uploadAttachment, sanitizeFilename } from '../../../lib/storage'
 // Disable body parsing - we need the raw email payload
 export const config = { api: { bodyParser: false } }
 
+function normalizeSubject(subject: string): string {
+  return subject.replace(/^((re|fwd?):\s*)+/i, '').trim().toLowerCase()
+}
+
 async function getRawBody(req: NextApiRequest): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -64,15 +68,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       thread = referencedMsg?.thread ?? null
     }
 
-    // Or match by subject + identity as a fallback
+    // Fallback: same identity, same sender already in the thread, and an exact match
+    // on the normalized subject (not `contains` — a short/common subject could
+    // otherwise merge two unrelated conversations into one thread).
     if (!thread) {
-      thread = await prisma.thread.findFirst({
+      const fromEmail = fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]?.toLowerCase()
+      const normalizedSubject = normalizeSubject(subject)
+      const candidates = await prisma.thread.findMany({
         where: {
           identityId: identity.id,
-          subject: { contains: subject.replace(/^(Re:\s*)+/i, '').trim() },
+          ...(fromEmail ? { participants: { has: fromEmail } } : {}),
         },
         orderBy: { lastAt: 'desc' },
+        take: 20,
       })
+      thread = candidates.find(t => normalizeSubject(t.subject) === normalizedSubject) ?? null
     }
 
     const ccEmails = ccAddress ? ccAddress.match(/[\w.+-]+@[\w.-]+\.\w+/g) ?? [] : []

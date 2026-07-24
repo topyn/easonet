@@ -9,7 +9,7 @@ interface User { id: string; email: string; plan: string; trialEndsAt: string | 
 interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean }
 interface AttachmentMeta { id: string; filename: string; mimeType: string; size: number }
 interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; _count?: { attachments: number } }
-interface StagedAttachment { path: string; filename: string; mimeType: string; size: number }
+interface StagedAttachment { path?: string; attachmentId?: string; filename: string; mimeType: string; size: number }
 interface Thread { id: string; subject: string; lastAt: string; read: boolean; status: string; participants: string[]; identity: Identity; messages: Message[] }
 interface DnsResult { mx: boolean; spf: boolean }
 
@@ -34,6 +34,10 @@ function formatBytes(n: number) {
   if (n < 1024) return `${n}B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)}KB`
   return `${(n / 1024 / 1024).toFixed(1)}MB`
+}
+
+function normalizeSubject(subject: string): string {
+  return subject.replace(/^((re|fwd?):\s*)+/i, '').trim()
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -313,6 +317,21 @@ export default function App() {
     }
   }
 
+  function forwardMessage(m: Message) {
+    if (!activeThread) return
+    const quoted = `\n\n---------- Forwarded message ----------\nFrom: ${m.fromAddress}\nDate: ${new Date(m.createdAt).toLocaleString()}\nSubject: ${activeThread.subject}\nTo: ${m.toAddress}${m.ccAddress ? `\nCc: ${m.ccAddress}` : ''}\n\n${m.bodyText}`
+    setComposeIdentityId(activeThread.identity.id)
+    setComposeTo('')
+    setComposeCc('')
+    setComposeBcc('')
+    setShowCcBcc(false)
+    setComposeSubject(`Fwd: ${normalizeSubject(activeThread.subject)}`)
+    setComposeText(quoted)
+    setComposeAttachments((m.attachments ?? []).map(a => ({ attachmentId: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })))
+    setComposeError('')
+    setComposing(true)
+  }
+
   async function stageAttachments(files: FileList | null) {
     if (!files || files.length === 0) return
     setComposeError('')
@@ -342,8 +361,12 @@ export default function App() {
     }
   }
 
-  function removeAttachment(path: string) {
-    setComposeAttachments(prev => prev.filter(a => a.path !== path))
+  function attachmentKey(a: StagedAttachment) {
+    return a.path ?? a.attachmentId ?? a.filename
+  }
+
+  function removeAttachment(key: string) {
+    setComposeAttachments(prev => prev.filter(a => attachmentKey(a) !== key))
   }
 
   async function downloadAttachment(id: string) {
@@ -613,6 +636,10 @@ export default function App() {
                               ))}
                             </div>
                           )}
+                          <button
+                            onClick={() => forwardMessage(m)}
+                            style={{ marginTop: 6, padding: '3px 10px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 10, color: '#444', fontFamily: "'DM Mono', monospace" }}
+                          >↪ forward</button>
                         </div>
                       ))}
                     </div>
@@ -763,9 +790,9 @@ export default function App() {
                     {composeAttachments.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 18px 12px' }}>
                         {composeAttachments.map(a => (
-                          <div key={a.path} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: BG3, border: `1px solid ${BORDER2}`, borderRadius: 6, fontSize: 11, fontFamily: "'DM Mono', monospace", color: TEXT }}>
+                          <div key={attachmentKey(a)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: BG3, border: `1px solid ${BORDER2}`, borderRadius: 6, fontSize: 11, fontFamily: "'DM Mono', monospace", color: TEXT }}>
                             <span>📎 {a.filename} <span style={{ color: MUTED }}>({formatBytes(a.size)})</span></span>
-                            <button onClick={() => removeAttachment(a.path)} style={{ border: 'none', background: 'none', color: MUTED, cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
+                            <button onClick={() => removeAttachment(attachmentKey(a))} style={{ border: 'none', background: 'none', color: MUTED, cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
                           </div>
                         ))}
                       </div>
