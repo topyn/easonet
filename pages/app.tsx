@@ -7,7 +7,9 @@ import { authFetch, getToken, clearTokens, setTokens } from '../lib/auth-client'
 
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
 interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean }
-interface Message { id: string; direction: string; fromAddress: string; toAddress: string; bodyText: string; bodyHtml?: string; createdAt: string }
+interface AttachmentMeta { id: string; filename: string; mimeType: string; size: number }
+interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; _count?: { attachments: number } }
+interface StagedAttachment { path: string; filename: string; mimeType: string; size: number }
 interface Thread { id: string; subject: string; lastAt: string; read: boolean; participants: string[]; identity: Identity; messages: Message[] }
 interface DnsResult { mx: boolean; spf: boolean }
 
@@ -24,6 +26,23 @@ const ACCENT = '#7B6EF6'
 
 function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+function formatBytes(n: number) {
+  if (n < 1024) return `${n}B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)}KB`
+  return `${(n / 1024 / 1024).toFixed(1)}MB`
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 // ── DNS Wizard ────────────────────────────────────────────────────────────
 type DnsProvider = 'Cloudflare' | 'GoDaddy' | 'Namecheap'
@@ -185,12 +204,24 @@ export default function App() {
   const [addingIdentity, setAddingIdentity] = useState(false)
   const [composeIdentityId, setComposeIdentityId] = useState('')
   const [composeTo, setComposeTo] = useState('')
+  const [composeCc, setComposeCc] = useState('')
+  const [composeBcc, setComposeBcc] = useState('')
+  const [showCcBcc, setShowCcBcc] = useState(false)
   const [composeSubject, setComposeSubject] = useState('')
   const [composeText, setComposeText] = useState('')
   const [composeSending, setComposeSending] = useState(false)
+  const [composeError, setComposeError] = useState('')
+  const [composeAttachments, setComposeAttachments] = useState<StagedAttachment[]>([])
+  const [attachmentUploading, setAttachmentUploading] = useState(false)
+  const [replyError, setReplyError] = useState('')
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newColor, setNewColor] = useState(COLORS[0])
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     try {
@@ -217,27 +248,102 @@ export default function App() {
     return list
   }, [composeIdentityId])
 
-  const loadThreads = useCallback(async () => {
-    const url = activeIdentityId ? `/api/emails/threads?identityId=${activeIdentityId}` : '/api/emails/threads'
-    const data = await api(url)
-    setThreads(Array.isArray(data) ? data : [])
-  }, [activeIdentityId])
+  const threadsUrl = useCallback((cursor?: string) => {
+    const params = new URLSearchParams()
+    if (activeIdentityId) params.set('identityId', activeIdentityId)
+    if (search) params.set('q', search)
+    if (cursor) params.set('cursor', cursor)
+    const qs = params.toString()
+    return qs ? `/api/emails/threads?${qs}` : '/api/emails/threads'
+  }, [activeIdentityId, search])
 
-  useEffect(() => { if (!loading) { loadIdentities(); loadThreads() } }, [loading])
+  const loadThreads = useCallback(async () => {
+    const data = await api(threadsUrl())
+    setThreads(Array.isArray(data.threads) ? data.threads : [])
+    setNextCursor(data.nextCursor ?? null)
+  }, [threadsUrl])
+
+  const loadMoreThreads = useCallback(async () => {
+    if (!nextCursor || loadingMore) return
+    setLoadingMore(true)
+    const data = await api(threadsUrl(nextCursor))
+    setThreads(prev => [...prev, ...(Array.isArray(data.threads) ? data.threads : [])])
+    setNextCursor(data.nextCursor ?? null)
+    setLoadingMore(false)
+  }, [threadsUrl, nextCursor, loadingMore])
+
+  useEffect(() => { if (!loading) loadIdentities() }, [loading])
+  useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search])
+
+  // Debounce the search box into `search`
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   async function openThread(t: Thread) {
+    setReplyError('')
     const data = await api(`/api/emails/thread/${t.id}`)
     setActiveThread(data.id ? data : { ...t, messages: t.messages ?? [] })
+  }
+
+  async function stageAttachments(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setComposeError('')
+    setAttachmentUploading(true)
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          setComposeError(`"${file.name}" is too large — max ${formatBytes(MAX_ATTACHMENT_BYTES)}`)
+          continue
+        }
+        const dataBase64 = await fileToBase64(file)
+        const res = await post('/api/emails/attachments/upload', {
+          filename: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          dataBase64,
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          setComposeError(data.error || `Failed to upload "${file.name}"`)
+          continue
+        }
+        const meta: StagedAttachment = await res.json()
+        setComposeAttachments(prev => [...prev, meta])
+      }
+    } finally {
+      setAttachmentUploading(false)
+    }
+  }
+
+  function removeAttachment(path: string) {
+    setComposeAttachments(prev => prev.filter(a => a.path !== path))
+  }
+
+  async function downloadAttachment(id: string) {
+    const data = await api(`/api/emails/attachments/${id}`)
+    if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer')
   }
 
   async function sendEmail() {
     if (!composeTo || !composeSubject || !composeText || !composeIdentityId) return
     setComposeSending(true)
-    await post('/api/emails/send', { identityId: composeIdentityId, to: composeTo, subject: composeSubject, text: composeText })
-    setComposeSending(false)
-    setComposing(false)
-    setComposeTo(''); setComposeSubject(''); setComposeText('')
-    loadThreads()
+    setComposeError('')
+    try {
+      const res = await post('/api/emails/send', { identityId: composeIdentityId, to: composeTo, cc: composeCc || undefined, bcc: composeBcc || undefined, subject: composeSubject, text: composeText, attachments: composeAttachments })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setComposeError(data.error ? JSON.stringify(data.error) : 'Failed to send — please try again')
+        return
+      }
+      setComposing(false)
+      setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false); setComposeSubject(''); setComposeText(''); setComposeAttachments([])
+      loadThreads()
+    } catch {
+      setComposeError('Failed to send — check your connection and try again')
+    } finally {
+      setComposeSending(false)
+    }
   }
 
   async function addIdentity() {
@@ -419,6 +525,14 @@ export default function App() {
                       {activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
                     </div>
                   </div>
+                  {!activeThread && (
+                    <input
+                      value={searchInput}
+                      onChange={e => setSearchInput(e.target.value)}
+                      placeholder="search subject or address…"
+                      style={{ width: 220, padding: '6px 12px', background: BG, border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, color: TEXT, outline: 'none', fontFamily: "'DM Mono', monospace" }}
+                    />
+                  )}
                   <button onClick={loadThreads} style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>↻</button>
                   <button onClick={() => setComposing(true)} style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
                 </div>
@@ -436,35 +550,69 @@ export default function App() {
                         <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
                           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', marginBottom: 6 }}>
                             {m.direction === 'outbound' ? `you (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}
+                            {m.ccAddress && <> · cc: {m.ccAddress}</>}
                           </div>
                           <div style={{ maxWidth: '70%', background: m.direction === 'outbound' ? ACCENT : BG3, color: TEXT, padding: '12px 16px', borderRadius: m.direction === 'outbound' ? '12px 12px 4px 12px' : '12px 12px 12px 4px', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', border: m.direction === 'outbound' ? 'none' : `1px solid ${BORDER}` }}>
                             {m.bodyText}
                           </div>
+                          {(m.attachments ?? []).length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6, maxWidth: '70%' }}>
+                              {m.attachments!.map(a => (
+                                <button
+                                  key={a.id}
+                                  onClick={() => downloadAttachment(a.id)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: BG3, border: `1px solid ${BORDER2}`, borderRadius: 6, fontSize: 11, fontFamily: "'DM Mono', monospace", color: TEXT, cursor: 'pointer' }}
+                                >
+                                  📎 {a.filename} <span style={{ color: MUTED }}>({formatBytes(a.size)})</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
-                    <div style={{ padding: '16px 24px', borderTop: `1px solid ${BORDER}`, display: 'flex', gap: 10 }}>
-                      <textarea
-                        id="quick-reply"
-                        placeholder="// quick reply…"
-                        style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', fontSize: 13, color: TEXT, resize: 'none', outline: 'none', height: 64, fontFamily: "'DM Sans', sans-serif" }}
-                      />
-                      <button
-                        onClick={async () => {
-                          const el = document.getElementById('quick-reply') as HTMLTextAreaElement
-                          if (!el?.value) return
-                          await post('/api/emails/send', {
-                            identityId: activeThread.identity.id,
-                            to: activeThread.participants.find(p => p !== activeThread.identity.email) ?? activeThread.participants[0],
-                            subject: `Re: ${activeThread.subject}`,
-                            text: el.value,
-                            threadId: activeThread.id,
-                          })
-                          el.value = ''
-                          openThread(activeThread)
-                        }}
-                        style={{ padding: '10px 20px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', alignSelf: 'flex-end', fontFamily: "'DM Sans', sans-serif" }}
-                      >Send</button>
+                    <div style={{ padding: '16px 24px', borderTop: `1px solid ${BORDER}` }}>
+                      {replyError && (
+                        <div style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 7, color: '#ff6b6b', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{replyError}</div>
+                      )}
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <textarea
+                          id="quick-reply"
+                          placeholder="// quick reply…"
+                          style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', fontSize: 13, color: TEXT, resize: 'none', outline: 'none', height: 64, fontFamily: "'DM Sans', sans-serif" }}
+                        />
+                        <button
+                          onClick={async () => {
+                            const el = document.getElementById('quick-reply') as HTMLTextAreaElement
+                            if (!el?.value) return
+                            setReplyError('')
+                            try {
+                              const others = activeThread.participants.filter(p => p !== activeThread.identity.email)
+                              const replyTo = others[0] ?? activeThread.participants[0]
+                              const replyCc = others.slice(1)
+                              const res = await post('/api/emails/send', {
+                                identityId: activeThread.identity.id,
+                                to: replyTo,
+                                cc: replyCc.length ? replyCc.join(', ') : undefined,
+                                subject: `Re: ${activeThread.subject}`,
+                                text: el.value,
+                                threadId: activeThread.id,
+                              })
+                              if (!res.ok) {
+                                const data = await res.json().catch(() => ({}))
+                                setReplyError(data.error ? JSON.stringify(data.error) : 'Failed to send — please try again')
+                                return
+                              }
+                              el.value = ''
+                              openThread(activeThread)
+                              loadThreads()
+                            } catch {
+                              setReplyError('Failed to send — check your connection and try again')
+                            }
+                          }}
+                          style={{ padding: '10px 20px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', alignSelf: 'flex-end', fontFamily: "'DM Sans', sans-serif" }}
+                        >Send</button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -506,11 +654,24 @@ export default function App() {
                               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap' }}>{new Date(t.lastAt).toLocaleDateString()}</span>
                             </div>
                             <div style={{ fontSize: 13, fontWeight: isUnread ? 500 : 400, color: isUnread ? TEXT : MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 2 }}>{t.subject}</div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lastMsg?.bodyText?.slice(0, 80) ?? ''}</div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {lastMsg?._count?.attachments ? '📎 ' : ''}{lastMsg?.bodyText?.slice(0, 80) ?? ''}
+                            </div>
                           </div>
                         </div>
                       )
                     })}
+                    {nextCursor && (
+                      <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 24px' }}>
+                        <button
+                          onClick={loadMoreThreads}
+                          disabled={loadingMore}
+                          style={{ padding: '8px 20px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 12, cursor: loadingMore ? 'not-allowed' : 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}
+                        >
+                          {loadingMore ? 'Loading…' : 'Load more'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -527,7 +688,18 @@ export default function App() {
                           {identities.map(id => <option key={id.id} value={id.id}>{id.email}</option>)}
                         </select>
                       )},
-                      { label: 'to', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="recipient@example.com" value={composeTo} onChange={e => setComposeTo(e.target.value)} /> },
+                      { label: 'to', content: (
+                        <div style={{ display: 'flex', flex: 1, alignItems: 'center', gap: 8 }}>
+                          <input style={{ ...inputStyle, flex: 1, background: 'transparent', border: 'none', padding: 0 }} placeholder="recipient@example.com, another@example.com" value={composeTo} onChange={e => setComposeTo(e.target.value)} />
+                          {!showCcBcc && (
+                            <button onClick={() => setShowCcBcc(true)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#444', border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>Cc/Bcc</button>
+                          )}
+                        </div>
+                      )},
+                      ...(showCcBcc ? [
+                        { label: 'cc', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="cc@example.com" value={composeCc} onChange={e => setComposeCc(e.target.value)} /> },
+                        { label: 'bcc', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="bcc@example.com" value={composeBcc} onChange={e => setComposeBcc(e.target.value)} /> },
+                      ] : []),
                       { label: 'subj', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} /> },
                     ].map(f => (
                       <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: `1px solid ${BORDER}` }}>
@@ -543,11 +715,28 @@ export default function App() {
                         onChange={e => setComposeText(e.target.value)}
                       />
                     </div>
+                    {composeAttachments.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 18px 12px' }}>
+                        {composeAttachments.map(a => (
+                          <div key={a.path} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: BG3, border: `1px solid ${BORDER2}`, borderRadius: 6, fontSize: 11, fontFamily: "'DM Mono', monospace", color: TEXT }}>
+                            <span>📎 {a.filename} <span style={{ color: MUTED }}>({formatBytes(a.size)})</span></span>
+                            <button onClick={() => removeAttachment(a.path)} style={{ border: 'none', background: 'none', color: MUTED, cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {composeError && (
+                      <div style={{ margin: '0 18px 12px', padding: '8px 12px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 7, color: '#ff6b6b', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{composeError}</div>
+                    )}
                     <div style={{ display: 'flex', gap: 8, padding: '12px 18px', borderTop: `1px solid ${BORDER}` }}>
                       <button onClick={sendEmail} disabled={composeSending} style={{ padding: '8px 20px', background: composeSending ? '#333' : ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: composeSending ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
                         {composeSending ? 'Sending…' : 'Send →'}
                       </button>
-                      <button onClick={() => setComposing(false)} style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
+                      <button onClick={() => { setComposing(false); setComposeError('') }} style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
+                      <input ref={attachmentInputRef} type="file" multiple style={{ display: 'none' }} onChange={e => { stageAttachments(e.target.files); e.target.value = '' }} />
+                      <button onClick={() => attachmentInputRef.current?.click()} disabled={attachmentUploading} title="Attach files" style={{ marginLeft: 'auto', padding: '8px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: attachmentUploading ? 'not-allowed' : 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>
+                        {attachmentUploading ? '…' : '📎'}
+                      </button>
                     </div>
                   </div>
                 )}

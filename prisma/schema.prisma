@@ -66,6 +66,8 @@ model Message {
   direction        String    // "inbound" | "outbound"
   fromAddress      String
   toAddress        String
+  ccAddress        String?
+  bccAddress       String?
   subject          String
   bodyText         String    @db.Text
   bodyHtml         String?   @db.Text
@@ -73,6 +75,18 @@ model Message {
   sentByIdentityId String?
   sentByIdentity   Identity? @relation("SentMessages", fields: [sentByIdentityId], references: [id])
   createdAt        DateTime  @default(now())
+  attachments      Attachment[]
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  messageId   String
+  message     Message  @relation(fields: [messageId], references: [id])
+  filename    String
+  mimeType    String
+  size        Int
+  storagePath String
+  createdAt   DateTime @default(now())
 }
 
 model Waitlist {

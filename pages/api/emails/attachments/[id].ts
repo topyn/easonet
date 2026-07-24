@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../../lib/prisma'
 import { getUser } from '../../../../lib/supabase-server'
+import { signAttachmentUrl } from '../../../../lib/storage'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
@@ -13,17 +14,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { id } = req.query
 
-  const thread = await prisma.thread.findFirst({
+  const attachment = await prisma.attachment.findFirst({
     where: { id: String(id) },
-    include: {
-      identity: { select: { id: true, name: true, email: true, color: true } },
-      messages: { orderBy: { createdAt: 'asc' }, include: { attachments: true } },
-    },
+    include: { message: { include: { thread: true } } },
   })
 
-  if (!thread || thread.userId !== dbUser.id) return res.status(404).json({ error: 'Thread not found' })
+  if (!attachment || attachment.message.thread.userId !== dbUser.id) {
+    return res.status(404).json({ error: 'Attachment not found' })
+  }
 
-  await prisma.thread.update({ where: { id: thread.id }, data: { read: true } })
-
-  return res.json(thread)
+  try {
+    const url = await signAttachmentUrl(req, res, attachment.storagePath, 60)
+    return res.json({ url, filename: attachment.filename })
+  } catch (err) {
+    console.error('ATTACHMENT DOWNLOAD ERROR:', err)
+    return res.status(500).json({ error: 'Failed to generate download link' })
+  }
 }

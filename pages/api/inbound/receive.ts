@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { randomUUID } from 'crypto'
 import { prisma } from '../../../lib/prisma'
 import { simpleParser } from 'mailparser'
+import { uploadAttachment, sanitizeFilename } from '../../../lib/storage'
 
 // Disable body parsing - we need the raw email payload
 export const config = { api: { bodyParser: false } }
@@ -33,6 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const toAddress = parsed.to
       ? (Array.isArray(parsed.to) ? parsed.to[0] : parsed.to).text
       : ''
+    const ccAddress = parsed.cc
+      ? (Array.isArray(parsed.cc) ? parsed.cc[0] : parsed.cc).text
+      : undefined
     const fromAddress = parsed.from?.text ?? ''
     const subject = parsed.subject ?? '(no subject)'
     const messageId = parsed.messageId ?? undefined
@@ -70,6 +75,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
+    const ccEmails = ccAddress ? ccAddress.match(/[\w.+-]+@[\w.-]+\.\w+/g) ?? [] : []
+
     // Create new thread if no match
     if (!thread) {
       thread = await prisma.thread.create({
@@ -77,7 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           subject,
           identityId: identity.id,
           userId: identity.userId,
-          participants: [toEmail, fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? fromAddress],
+          participants: [toEmail, fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? fromAddress, ...ccEmails],
           lastAt: new Date(),
         },
       })
@@ -88,18 +95,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    await prisma.message.create({
+    const message = await prisma.message.create({
       data: {
         threadId: thread.id,
         direction: 'inbound',
         fromAddress,
         toAddress,
+        ccAddress: ccAddress || null,
         subject,
         bodyText: parsed.text ?? '',
         bodyHtml: parsed.html || null,
         rawMessageId: messageId,
       },
     })
+
+    for (const att of parsed.attachments ?? []) {
+      const path = `inbound/${identity.id}/${randomUUID()}-${sanitizeFilename(att.filename || 'attachment')}`
+      try {
+        await uploadAttachment(req, res, path, att.content, att.contentType || 'application/octet-stream')
+        await prisma.attachment.create({
+          data: {
+            messageId: message.id,
+            filename: att.filename || 'attachment',
+            mimeType: att.contentType || 'application/octet-stream',
+            size: att.size ?? att.content.length,
+            storagePath: path,
+          },
+        })
+      } catch (err) {
+        console.error('Inbound attachment upload failed:', err)
+      }
+    }
 
     return res.status(200).json({ ok: true, threadId: thread.id })
   } catch (err) {
