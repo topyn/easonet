@@ -36,9 +36,15 @@ export function isTokenExpired(): boolean {
   } catch { return true }
 }
 
-export async function refreshTokenIfNeeded(): Promise<boolean> {
-  if (!isTokenExpired()) return true
+// Supabase refresh tokens are single-use and rotate on every refresh. Without this,
+// two components mounting at once (e.g. loadIdentities + loadThreads on app load) each
+// independently see an expired token and both fire a refresh with the same refresh
+// token - the second one lands on an already-rotated token, fails, and (depending on
+// Supabase's reuse-detection) can revoke the whole session. Sharing one in-flight
+// refresh across every caller closes that race.
+let refreshPromise: Promise<boolean> | null = null
 
+async function doRefresh(): Promise<boolean> {
   const refreshToken = getRefreshToken()
   if (!refreshToken) return false
 
@@ -55,10 +61,29 @@ export async function refreshTokenIfNeeded(): Promise<boolean> {
   } catch { return false }
 }
 
+export async function refreshTokenIfNeeded(): Promise<boolean> {
+  if (!isTokenExpired()) return true
+  if (!refreshPromise) refreshPromise = doRefresh().finally(() => { refreshPromise = null })
+  return refreshPromise
+}
+
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  // Try to refresh token if expired
-  await refreshTokenIfNeeded()
-  
+  const refreshed = await refreshTokenIfNeeded()
+
+  if (!refreshed) {
+    // The session is dead and can't be silently repaired - clear it and bounce to login
+    // instead of sending a request we already know will be rejected, which is what let
+    // this fail silently as "no data" everywhere instead of as a visible logged-out state.
+    clearTokens()
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+    return new Response(JSON.stringify({ error: 'Session expired' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   const token = getToken()
   return fetch(url, {
     ...options,
