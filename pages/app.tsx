@@ -354,6 +354,23 @@ export default function App() {
   useEffect(() => { if (!loading) loadIdentities() }, [loading])
   useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search, showArchived])
 
+  // Poll for new mail - nothing pushes updates to the client, so without this an
+  // inbound email just sits there until something else happens to trigger a refetch.
+  useEffect(() => {
+    if (loading) return
+    const POLL_MS = 30000
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') loadThreads()
+    }, POLL_MS)
+    // Also refresh immediately on tab focus, instead of waiting up to 30s after switching back
+    const onVisible = () => { if (document.visibilityState === 'visible') loadThreads() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loading, loadThreads])
+
   // Check for a leftover draft once on mount, so "Resume draft" can appear before compose is even opened
   useEffect(() => { setHasDraft(!!loadDraft()) }, [])
 
