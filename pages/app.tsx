@@ -580,14 +580,17 @@ export default function App() {
     if (created) setWizardIdentity(created)
   }
 
-  async function logout() {
+  function logout() {
     clearTokens()
-    router.replace('/login')
+    // A hard navigation, not router.replace - guarantees the next page load fetches
+    // fresh JS instead of continuing to run whatever bundle is already in memory.
+    window.location.href = '/login'
   }
 
   if (loading) return (
-    <div style={{ background: BG, height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#333' }}>
+    <div style={{ background: BG, height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#333' }}>
       // loading…
+      <button onClick={logout} style={{ padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'transparent', color: '#666', fontFamily: "'DM Mono', monospace" }}>Sign out</button>
     </div>
   )
 
@@ -756,7 +759,7 @@ export default function App() {
                   {user?.plan === 'trial' ? 'trial' : user?.plan}
                 </div>
               </div>
-              <button onClick={logout} style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>// sign out</button>
+              <button onClick={logout} style={{ width: '100%', padding: '7px 0', fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Sign out</button>
             </div>
           </div>
 
@@ -803,6 +806,7 @@ export default function App() {
                     <button onClick={resumeDraft} title="Resume your saved draft" style={{ padding: '7px 14px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: ACCENT, fontFamily: "'DM Mono', monospace" }}>Resume draft</button>
                   )}
                   <button onClick={openCompose} title="Compose (c)" style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
+                  <button onClick={logout} title="Sign out" style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>⏻</button>
                 </div>
 
                 {/* Thread detail */}
