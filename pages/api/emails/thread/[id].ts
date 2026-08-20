@@ -5,8 +5,24 @@ import { getUser } from '../../../../lib/supabase-server'
 
 const PatchSchema = z.object({
   read: z.boolean().optional(),
-  status: z.enum(['open', 'archived']).optional(),
+  status: z.enum(['open', 'archived', 'spam']).optional(),
+  // Only meaningful alongside status:'spam' — also blocks the sender so future mail from
+  // them is auto-routed to spam (see pages/api/inbound/receive.ts), and sweeps any of their
+  // other open threads into spam right away.
+  blockSender: z.boolean().optional(),
 })
+
+// The address a thread's spam/block action applies to — derived from the thread's own first
+// inbound message rather than trusted from the client, since ownership of the thread (checked
+// by the caller) is what authorises this, not an arbitrary client-supplied address.
+async function getThreadSenderAddress(threadId: string): Promise<string | null> {
+  const firstInbound = await prisma.message.findFirst({
+    where: { threadId, direction: 'inbound' },
+    orderBy: { createdAt: 'asc' },
+    select: { fromAddress: true },
+  })
+  return firstInbound?.fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]?.toLowerCase() ?? null
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'PATCH') {
@@ -30,7 +46,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     if (Object.keys(parsed.data).length === 0) return res.status(400).json({ error: 'Nothing to update' })
 
-    const thread = await prisma.thread.update({ where: { id: owned.id }, data: parsed.data })
+    const before = await prisma.thread.findUnique({ where: { id: owned.id }, select: { status: true } })
+
+    const { blockSender, ...threadUpdate } = parsed.data
+    const thread = await prisma.thread.update({ where: { id: owned.id }, data: threadUpdate })
+
+    // Marking as spam blocks the sender for future mail and sweeps their other open threads
+    // into spam right away — that's the actual point of the action, not just this one thread.
+    if (parsed.data.status === 'spam' && blockSender) {
+      const addr = await getThreadSenderAddress(owned.id)
+      if (addr) {
+        await prisma.blockedSender.upsert({
+          where: { userId_address: { userId: dbUser.id, address: addr } },
+          create: { userId: dbUser.id, address: addr },
+          update: {},
+        })
+        await prisma.thread.updateMany({
+          where: { userId: dbUser.id, status: 'open', participants: { has: addr }, id: { not: owned.id } },
+          data: { status: 'spam' },
+        })
+      }
+    }
+
+    // Explicitly un-spamming a thread also unblocks the sender, so future mail from them
+    // stops being auto-routed to spam — the reverse of the block above.
+    if (parsed.data.status === 'open' && before?.status === 'spam') {
+      const addr = await getThreadSenderAddress(owned.id)
+      if (addr) await prisma.blockedSender.deleteMany({ where: { userId: dbUser.id, address: addr } })
+    }
+
     return res.json(thread)
   }
 

@@ -22,6 +22,7 @@ model User {
   waitlists         Waitlist[]
   stores            Store[]
   brandPages        BrandPage[]
+  blockedSenders    BlockedSender[]
 }
 
 model Identity {
@@ -89,6 +90,18 @@ model Attachment {
   size        Int
   storagePath String
   createdAt   DateTime @default(now())
+}
+
+// A sender address a user has marked as spam — inbound mail from this address is
+// auto-routed to the spam folder instead of the inbox (see pages/api/inbound/receive.ts).
+model BlockedSender {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  address   String   // lowercased email address
+  createdAt DateTime @default(now())
+
+  @@unique([userId, address])
 }
 
 model Waitlist {

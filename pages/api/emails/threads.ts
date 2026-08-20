@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const where = {
     userId: dbUser.id,
-    status: status === 'archived' ? 'archived' : 'open',
+    status: status === 'archived' ? 'archived' : status === 'spam' ? 'spam' : 'open',
     ...(identityId ? { identityId: String(identityId) } : {}),
     ...(q ? {
       OR: [

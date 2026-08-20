@@ -58,6 +58,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ ok: true, note: 'unknown alias, dropped' })
     }
 
+    const fromEmail = fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]?.toLowerCase()
+
+    // A user marking a thread as spam blocks the sender going forward — new mail from them
+    // still arrives and is stored (never silently dropped, so a mistaken block is
+    // recoverable), it just lands in spam instead of the inbox. Existing open threads from
+    // this sender were already swept to spam at block-time (see the thread PATCH handler).
+    const isBlocked = fromEmail
+      ? !!(await prisma.blockedSender.findUnique({ where: { userId_address: { userId: identity.userId, address: fromEmail } } }))
+      : false
+
     // Try to match to an existing thread via In-Reply-To header
     let thread = null
     if (inReplyTo) {
@@ -72,7 +82,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // on the normalized subject (not `contains` — a short/common subject could
     // otherwise merge two unrelated conversations into one thread).
     if (!thread) {
-      const fromEmail = fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]?.toLowerCase()
       const normalizedSubject = normalizeSubject(subject)
       const candidates = await prisma.thread.findMany({
         where: {
@@ -94,8 +103,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           subject,
           identityId: identity.id,
           userId: identity.userId,
-          participants: [toEmail, fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? fromAddress, ...ccEmails],
+          participants: [toEmail, fromEmail ?? fromAddress, ...ccEmails],
           lastAt: new Date(),
+          status: isBlocked ? 'spam' : 'open',
         },
       })
     } else {

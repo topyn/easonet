@@ -267,7 +267,7 @@ export default function App() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [activeIdentityId, setActiveIdentityId] = useState<string | null>(null)
   const [activeThread, setActiveThread] = useState<Thread | null>(null)
-  const [showArchived, setShowArchived] = useState(false)
+  const [folder, setFolder] = useState<'inbox' | 'archived' | 'spam'>('inbox')
   const [threadActionBusy, setThreadActionBusy] = useState(false)
   const [replyCc, setReplyCc] = useState('')
   const [editingSignatureIdentity, setEditingSignatureIdentity] = useState<Identity | null>(null)
@@ -300,6 +300,7 @@ export default function App() {
   const [hasDraft, setHasDraft] = useState(false)
   const [composeSyncToken, setComposeSyncToken] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
 
   useEffect(() => {
     try {
@@ -331,10 +332,10 @@ export default function App() {
     if (activeIdentityId) params.set('identityId', activeIdentityId)
     if (search) params.set('q', search)
     if (cursor) params.set('cursor', cursor)
-    if (showArchived) params.set('status', 'archived')
+    if (folder !== 'inbox') params.set('status', folder)
     const qs = params.toString()
     return qs ? `/api/emails/threads?${qs}` : '/api/emails/threads'
-  }, [activeIdentityId, search, showArchived])
+  }, [activeIdentityId, search, folder])
 
   const loadThreads = useCallback(async () => {
     const data = await api(threadsUrl())
@@ -352,7 +353,7 @@ export default function App() {
   }, [threadsUrl, nextCursor, loadingMore])
 
   useEffect(() => { if (!loading) loadIdentities() }, [loading])
-  useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search, showArchived])
+  useEffect(() => { if (!loading) loadThreads() }, [loading, activeIdentityId, search, folder])
 
   // Poll for new mail - nothing pushes updates to the client, so without this an
   // inbound email just sits there until something else happens to trigger a refetch.
@@ -370,6 +371,23 @@ export default function App() {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [loading, loadThreads])
+
+  // Detect a new deploy going live while this tab is still running an older bundle -
+  // otherwise a tab left open silently misses any client-side fix shipped after it
+  // loaded (this is what caused repeated "session times out" reports: the fix for that
+  // exact problem was live on the server, but old tabs kept running pre-fix JS).
+  useEffect(() => {
+    let currentCommit: string | null = null
+    fetch('/api/build-info').then(r => r.json()).then(d => { currentCommit = d.commit }).catch(() => {})
+
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      fetch('/api/build-info').then(r => r.json()).then(d => {
+        if (currentCommit && d.commit && d.commit !== currentCommit) setUpdateAvailable(true)
+      }).catch(() => {})
+    }, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
   // Check for a leftover draft once on mount, so "Resume draft" can appear before compose is even opened
   useEffect(() => { setHasDraft(!!loadDraft()) }, [])
@@ -437,6 +455,20 @@ export default function App() {
     setThreadActionBusy(true)
     try {
       await patch(`/api/emails/thread/${threadId}`, { status: archived ? 'archived' : 'open' })
+      setActiveThread(null)
+      await loadThreads()
+    } finally {
+      setThreadActionBusy(false)
+    }
+  }
+
+  // Marking as spam also blocks the sender (future mail from them is auto-routed to spam,
+  // and their other open threads are swept into spam immediately) - see the thread PATCH
+  // handler. "Not spam" reverses both: restores the thread and unblocks the sender.
+  async function setThreadSpam(threadId: string, spam: boolean) {
+    setThreadActionBusy(true)
+    try {
+      await patch(`/api/emails/thread/${threadId}`, spam ? { status: 'spam', blockSender: true } : { status: 'open' })
       setActiveThread(null)
       await loadThreads()
     } finally {
@@ -665,6 +697,14 @@ export default function App() {
 
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'DM Sans', sans-serif", background: BG, color: TEXT, overflow: 'hidden' }}>
 
+        {/* Update available banner */}
+        {updateAvailable && (
+          <div style={{ background: 'rgba(62,207,142,0.06)', borderBottom: '1px solid rgba(62,207,142,0.15)', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
+            <span style={{ flex: 1, color: '#3ECF8E' }}>// a new version of easonet is available</span>
+            <button onClick={() => window.location.reload()} style={{ padding: '4px 14px', background: '#3ECF8E', border: 'none', borderRadius: 5, fontSize: 11, color: '#08130f', cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>Refresh</button>
+          </div>
+        )}
+
         {/* Trial banner */}
         {user && <TrialBanner plan={user.plan} trialEndsAt={user.trialEndsAt} identityCount={identities.length} />}
 
@@ -688,30 +728,39 @@ export default function App() {
 
                 {/* All inboxes */}
                 <div
-                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(false); setSidebarOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId && !showArchived ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId && !showArchived ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setFolder('inbox'); setSidebarOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId && folder === 'inbox' ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId && folder === 'inbox' ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444', flexShrink: 0 }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 12, color: !activeIdentityId && !showArchived ? TEXT : MUTED, fontWeight: !activeIdentityId && !showArchived ? 500 : 400 }}>All inboxes</div>
+                    <div style={{ fontSize: 12, color: !activeIdentityId && folder === 'inbox' ? TEXT : MUTED, fontWeight: !activeIdentityId && folder === 'inbox' ? 500 : 400 }}>All inboxes</div>
                     {unreadCount > 0 && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT }}>{unreadCount} unread</div>}
                   </div>
                 </div>
 
                 {/* Archived */}
                 <div
-                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setShowArchived(true); setSidebarOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: showArchived ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: showArchived ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setFolder('archived'); setSidebarOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'archived' ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: folder === 'archived' ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#555', flexShrink: 0 }} />
-                  <div style={{ fontSize: 12, color: showArchived ? TEXT : MUTED, fontWeight: showArchived ? 500 : 400 }}>Archived</div>
+                  <div style={{ fontSize: 12, color: folder === 'archived' ? TEXT : MUTED, fontWeight: folder === 'archived' ? 500 : 400 }}>Archived</div>
+                </div>
+
+                {/* Spam */}
+                <div
+                  onClick={() => { setActiveIdentityId(null); setActiveThread(null); setFolder('spam'); setSidebarOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'spam' ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: folder === 'spam' ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                >
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#c0392b', flexShrink: 0 }} />
+                  <div style={{ fontSize: 12, color: folder === 'spam' ? TEXT : MUTED, fontWeight: folder === 'spam' ? 500 : 400 }}>Spam</div>
                 </div>
 
                 {identities.map(id => (
                   <div
                     key={id.id}
-                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null); setShowArchived(false); setSidebarOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !showArchived && activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !showArchived && activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                    onClick={() => { setActiveIdentityId(id.id); setActiveThread(null); setFolder('inbox'); setSidebarOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'inbox' && activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: folder === 'inbox' && activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
                   >
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: id.color, flexShrink: 0 }} />
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -805,7 +854,7 @@ export default function App() {
                   >☰</button>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: -0.5, color: TEXT }}>
-                      {showArchived ? 'Archived' : activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
+                      {folder === 'archived' ? 'Archived' : folder === 'spam' ? 'Spam' : activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
                     </div>
                   </div>
                   {!activeThread && (
@@ -843,11 +892,17 @@ export default function App() {
                         disabled={threadActionBusy}
                         style={{ padding: '5px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 11, cursor: threadActionBusy ? 'not-allowed' : 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}
                       >{activeThread.status === 'archived' ? 'Unarchive' : 'Archive'}</button>
+                      <button
+                        onClick={() => setThreadSpam(activeThread.id, activeThread.status !== 'spam')}
+                        disabled={threadActionBusy}
+                        title={activeThread.status === 'spam' ? 'Restore and unblock this sender' : 'Move to spam and block this sender'}
+                        style={{ padding: '5px 12px', border: `1px solid ${activeThread.status === 'spam' ? 'rgba(192,57,43,0.4)' : BORDER}`, borderRadius: 7, fontSize: 11, cursor: threadActionBusy ? 'not-allowed' : 'pointer', background: 'transparent', color: activeThread.status === 'spam' ? '#e0776b' : MUTED, fontFamily: "'DM Mono', monospace" }}
+                      >{activeThread.status === 'spam' ? 'Not spam' : 'Mark as spam'}</button>
                     </div>
                     <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {(activeThread.messages ?? []).map(m => (
                         <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
-                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', marginBottom: 6 }}>
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: MUTED, marginBottom: 6 }}>
                             {m.direction === 'outbound' ? `you (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}
                             {m.ccAddress && <> · cc: {m.ccAddress}</>}
                           </div>
