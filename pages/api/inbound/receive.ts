@@ -64,7 +64,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // still arrives and is stored (never silently dropped, so a mistaken block is
     // recoverable), it just lands in spam instead of the inbox. Existing open threads from
     // this sender were already swept to spam at block-time (see the thread PATCH handler).
-    const isBlocked = fromEmail
+    // Guard: mail whose From is this identity's own address is never treated as blocked, even
+    // if a stale self-block row somehow exists — otherwise every self-addressed notification
+    // (a site emailing its own admin inbox) would land in spam.
+    const isBlocked = fromEmail && fromEmail !== toEmail
       ? !!(await prisma.blockedSender.findUnique({ where: { userId_address: { userId: identity.userId, address: fromEmail } } }))
       : false
 

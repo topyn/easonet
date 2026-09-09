@@ -895,7 +895,14 @@ export default function App() {
                       <button
                         onClick={() => setThreadSpam(activeThread.id, activeThread.status !== 'spam')}
                         disabled={threadActionBusy}
-                        title={activeThread.status === 'spam' ? 'Restore and unblock this sender' : 'Move to spam and block this sender'}
+                        title={(() => {
+                          const inbound = (activeThread.messages ?? []).find(m => m.direction === 'inbound')
+                          const addr = inbound?.fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]?.toLowerCase()
+                          const own = !!addr && identities.some(i => i.email.toLowerCase() === addr)
+                          if (activeThread.status === 'spam') return addr ? `Restore and unblock ${addr}` : 'Restore this thread'
+                          if (own) return `Move to spam (${addr} is your own address — the sender won't be blocked)`
+                          return addr ? `Move to spam and block ${addr}` : 'Move to spam'
+                        })()}
                         style={{ padding: '5px 12px', border: `1px solid ${activeThread.status === 'spam' ? 'rgba(192,57,43,0.4)' : BORDER}`, borderRadius: 7, fontSize: 11, cursor: threadActionBusy ? 'not-allowed' : 'pointer', background: 'transparent', color: activeThread.status === 'spam' ? '#e0776b' : MUTED, fontFamily: "'DM Mono', monospace" }}
                       >{activeThread.status === 'spam' ? 'Not spam' : 'Mark as spam'}</button>
                     </div>
@@ -1003,6 +1010,11 @@ export default function App() {
                       const lastMsg = t.messages?.[0]
                       const isUnread = !t.read
                       const otherParty = lastMsg?.direction === 'inbound' ? lastMsg.fromAddress.replace(/<.*>/, '').trim() : (t.participants?.find(p => p !== t.identity?.email) ?? 'You')
+                      // The raw sender address, always shown so a display name like "OzStorehouse"
+                      // can't hide which address you're actually acting on (e.g. when marking spam).
+                      const otherPartyEmail = (lastMsg?.direction === 'inbound'
+                        ? lastMsg.fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]
+                        : t.participants?.find(p => p !== t.identity?.email)) ?? ''
                       const initials = otherParty.slice(0, 2).toUpperCase()
                       return (
                         <div
@@ -1023,6 +1035,9 @@ export default function App() {
                               </span>
                               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap' }}>{new Date(t.lastAt).toLocaleDateString()}</span>
                             </div>
+                            {otherPartyEmail && otherPartyEmail.toLowerCase() !== otherParty.toLowerCase() && (
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 3 }}>{otherPartyEmail}</div>
+                            )}
                             <div style={{ fontSize: 13, fontWeight: isUnread ? 500 : 400, color: isUnread ? TEXT : MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 2 }}>{t.subject}</div>
                             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {lastMsg?._count?.attachments ? '📎 ' : ''}{lastMsg?.bodyText?.slice(0, 80) ?? ''}

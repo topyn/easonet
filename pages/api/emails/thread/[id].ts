@@ -55,7 +55,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // into spam right away — that's the actual point of the action, not just this one thread.
     if (parsed.data.status === 'spam' && blockSender) {
       const addr = await getThreadSenderAddress(owned.id)
-      if (addr) {
+      // NEVER block one of the user's own identity addresses. Some senders deliver notifications
+      // "from" the same address they're sent to (e.g. a site emailing its own admin inbox), so
+      // that address is in *every* thread's participants — blocking it would sweep the entire
+      // mailbox into spam and auto-spam all future mail. Just move this one thread.
+      const ownIdentities = await prisma.identity.findMany({ where: { userId: dbUser.id }, select: { email: true } })
+      const isOwnAddress = !!addr && ownIdentities.some(i => i.email.toLowerCase() === addr)
+      if (addr && !isOwnAddress) {
         await prisma.blockedSender.upsert({
           where: { userId_address: { userId: dbUser.id, address: addr } },
           create: { userId: dbUser.id, address: addr },
