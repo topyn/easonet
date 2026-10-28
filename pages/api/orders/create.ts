@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { getPayPalToken, PAYPAL_BASE_URL } from '../../../lib/paypal'
 import { rateLimit, clientIp } from '../../../lib/rateLimit'
+import { accountActive } from '../../../lib/plan'
 import { z } from 'zod'
 
 const CreateSchema = z.object({
@@ -34,9 +35,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: { store: true },
+    include: { store: { include: { user: { select: { plan: true, trialEndsAt: true } } } } },
   })
-  if (!product) return res.status(404).json({ error: 'Product not found' })
+  if (!product || !product.active || !product.store.active) return res.status(404).json({ error: 'Product not found' })
+  if (!accountActive(product.store.user)) return res.status(403).json({ error: 'This store is paused' })
+  if (product.stock !== null && product.stock < quantity) {
+    return res.status(400).json({ error: product.stock > 0 ? `Only ${product.stock} left` : 'Sold out' })
+  }
 
   const total = (product.price * quantity).toFixed(2)
 

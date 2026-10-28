@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { addDomainToVercel, removeDomainFromVercel, domainPointsAtVercel } from '../../../lib/vercel'
+import { addDomainToVercel, removeDomainFromVercel } from '../../../lib/vercel'
+import { customDomainError } from '../../../lib/customDomain'
 import { prisma } from '../../../lib/prisma'
 import { getUser } from '../../../lib/supabase-server'
 import { assertOwnedRefs } from '../../../lib/ownership'
@@ -67,18 +68,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const oldDomain = page.customDomain
     const newDomain = data.customDomain || null
 
-    // Require the domain to already point at Vercel before we ever claim it via the API -
-    // otherwise any signed-up user could squat an arbitrary domain they don't control.
+    // DNS must already point at Vercel (else any user could squat a domain they don't
+    // control), and the plan must be live and under its domain limit.
     if (newDomain && newDomain !== oldDomain) {
-      const pointsAtVercel = await domainPointsAtVercel(newDomain)
-      if (!pointsAtVercel) {
-        return res.status(400).json({ error: 'Point this domain at Vercel first (A record to 76.76.21.21, or a CNAME to cname.vercel-dns.com), then try again.' })
-      }
-    }
-
-    if (newDomain && newDomain !== oldDomain) {
-      const existingDomain = await prisma.brandPage.findFirst({ where: { customDomain: newDomain, id: { not: page.id } } })
-      if (existingDomain) return res.status(400).json({ error: 'That domain is already in use by another page' })
+      const domainError = await customDomainError(dbUser, newDomain, page.id)
+      if (domainError) return res.status(400).json({ error: domainError })
     }
 
     const existingSlug = data.slug !== page.slug

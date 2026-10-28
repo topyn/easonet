@@ -62,12 +62,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Payment not completed' })
     }
 
-    // Atomic pending -> paid: only the request that wins this sends the emails.
-    const claimed = await prisma.order.updateMany({
-      where: { id: orderId, status: 'pending' },
-      data: { status: 'paid' },
+    // Atomic pending -> paid: only the request that wins this takes the stock and sends the emails.
+    const claimed = await prisma.$transaction(async tx => {
+      const won = await tx.order.updateMany({
+        where: { id: orderId, status: 'pending' },
+        data: { status: 'paid' },
+      })
+      if (won.count === 1) {
+        // Untracked stock (null) is left alone. The buyer has already paid, so this may go
+        // below zero on a race - the seller sees it and refunds rather than losing the sale.
+        await tx.product.updateMany({
+          where: { id: order.productId, stock: { not: null } },
+          data: { stock: { decrement: order.quantity } },
+        })
+      }
+      return won.count === 1
     })
-    if (claimed.count === 0) return res.json(deliveryPayload)
+    if (!claimed) return res.json(deliveryPayload)
 
     if (order.store.identity) {
       const deliveryText = order.product.type === 'digital'

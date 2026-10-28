@@ -2,7 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { getUser } from '../../../lib/supabase-server'
 import { assertOwnedRefs } from '../../../lib/ownership'
+import { addDomainToVercel } from '../../../lib/vercel'
+import { customDomainError } from '../../../lib/customDomain'
 import { z } from 'zod'
+
+const DOMAIN_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.[a-z0-9-]{1,63})+$/i
 
 const CreateSchema = z.object({
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/),
@@ -56,6 +60,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const refError = await assertOwnedRefs(dbUser.id, parsed.data)
     if (refError) return res.status(403).json({ error: refError })
     const data = parsed.data
+    // Creating with a domain used to skip every check update enforces - run the same ones.
+    if (data.customDomain) {
+      if (!DOMAIN_RE.test(data.customDomain)) return res.status(400).json({ error: 'Invalid domain format' })
+      const domainError = await customDomainError(dbUser, data.customDomain)
+      if (domainError) return res.status(400).json({ error: domainError })
+    }
     const page = await prisma.brandPage.create({
       data: {
         ...data,
@@ -75,6 +85,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         contactSub: data.contactSub || null,
       },
     })
+    if (page.customDomain) {
+      const result = await addDomainToVercel(page.customDomain)
+      if (!result.success) console.warn('Could not auto-register domain with Vercel:', result.error)
+    }
     return res.status(201).json(page)
   }
 

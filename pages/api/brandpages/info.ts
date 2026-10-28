@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
+import { accountActive } from '../../../lib/plan'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).end()
@@ -7,20 +8,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { slug, domain } = req.query
 
-  let page = null
+  const owner = { user: { select: { plan: true, trialEndsAt: true } } }
+  let found = null
   if (slug) {
-    page = await prisma.brandPage.findUnique({ where: { slug: String(slug) } })
+    found = await prisma.brandPage.findUnique({ where: { slug: String(slug) }, include: owner })
   } else if (domain) {
-    page = await prisma.brandPage.findFirst({ where: { customDomain: String(domain) } })
+    found = await prisma.brandPage.findFirst({ where: { customDomain: String(domain) }, include: owner })
   }
 
-  if (!page) return res.status(404).json({ error: 'Not found' })
+  if (!found || !found.active) return res.status(404).json({ error: 'Not found' })
+  const { user, ...page } = found
+  if (!accountActive(user)) return res.status(404).json({ error: 'This site is paused' })
 
   // Fetch linked store products
   let storeData = null
   if (page.storeId) {
-    storeData = await prisma.store.findUnique({
-      where: { id: page.storeId },
+    storeData = await prisma.store.findFirst({
+      where: { id: page.storeId, active: true },
       select: {
         id: true, name: true, slug: true,
         products: { where: { active: true }, select: { id: true, name: true, description: true, price: true, currency: true, type: true, imageUrl: true } },
