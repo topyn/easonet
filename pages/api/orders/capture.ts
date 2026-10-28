@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { sendFromIdentity } from '../../../lib/mailer'
 import { escapeHtml } from '../../../lib/html'
-import { getPayPalToken, PAYPAL_BASE_URL } from '../../../lib/paypal'
+import { capturePayPalOrder, getPayPalOrder, verifyPaid } from '../../../lib/paypal'
 import { z } from 'zod'
 
 const CaptureSchema = z.object({
@@ -32,24 +32,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       store: { include: { identity: true } },
     },
   })
-  if (!order) return res.status(404).json({ error: 'Order not found' })
+  // The PayPal order must be the one create.ts made for *this* order - otherwise a cheap
+  // payment could be replayed against an expensive order.
+  if (!order || !order.paypalOrderId || order.paypalOrderId !== paypalOrderId) {
+    return res.status(404).json({ error: 'Order not found' })
+  }
+
+  const deliveryPayload = {
+    ok: true,
+    product: {
+      name: order.product.name,
+      type: order.product.type,
+      fileUrl: order.product.fileUrl,
+      deliveryNote: order.product.deliveryNote,
+    },
+  }
+
+  // Already settled by an earlier request - answer the same way, but don't re-capture or re-email.
+  if (order.status === 'paid') return res.json(deliveryPayload)
+  if (order.status !== 'pending') return res.status(400).json({ error: 'Order cannot be paid' })
 
   try {
-    const token = await getPayPalToken()
-    const captureRes = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders/${paypalOrderId}/capture`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    })
-    const captureData = await captureRes.json()
+    let paypalData = await capturePayPalOrder(paypalOrderId)
+    // A double-submit or retry gets ORDER_ALREADY_CAPTURED - check the order's real state instead.
+    if (paypalData?.status !== 'COMPLETED') paypalData = await getPayPalOrder(paypalOrderId)
 
-    if (captureData.status !== 'COMPLETED') {
+    if (!verifyPaid(paypalData, order.total, order.currency)) {
+      console.error('CAPTURE VERIFY FAILED:', orderId, paypalOrderId, paypalData?.status)
       return res.status(400).json({ error: 'Payment not completed' })
     }
 
-    await prisma.order.update({
-      where: { id: orderId },
+    // Atomic pending -> paid: only the request that wins this sends the emails.
+    const claimed = await prisma.order.updateMany({
+      where: { id: orderId, status: 'pending' },
       data: { status: 'paid' },
     })
+    if (claimed.count === 0) return res.json(deliveryPayload)
 
     if (order.store.identity) {
       const deliveryText = order.product.type === 'digital'
@@ -119,15 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    return res.json({
-      ok: true,
-      product: {
-        name: order.product.name,
-        type: order.product.type,
-        fileUrl: order.product.fileUrl,
-        deliveryNote: order.product.deliveryNote,
-      },
-    })
+    return res.json(deliveryPayload)
   } catch (err: any) {
     console.error('CAPTURE ERROR:', err.message)
     return res.status(500).json({ error: 'Failed to capture payment' })
