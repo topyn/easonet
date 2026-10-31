@@ -1,5 +1,5 @@
 import MarketingLayout, { CtaBand, PRICE } from '../components/marketing/MarketingLayout'
-import { FaqList, PriceCard } from '../components/marketing/content'
+import { CentralCoastCallout, FaqList, PriceCard } from '../components/marketing/content'
 
 export default function Pricing() {
   return (
@@ -30,6 +30,7 @@ export default function Pricing() {
           </div>
           <PriceCard />
         </div>
+        <div className="mk-wrap" style={{ marginTop: 48 }}><CentralCoastCallout /></div>
       </section>
 
       <section className="mk-section mk-section-alt" id="faq">

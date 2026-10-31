@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
 import MarketingLayout, { PRICE } from '../components/marketing/MarketingLayout'
+import { CentralCoastCallout } from '../components/marketing/content'
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', business: '', website: '', sells: '', company: '' })
@@ -57,6 +58,7 @@ export default function Register() {
               <li>A community of shop owners behind you</li>
               <li>No payment needed to register</li>
             </ul>
+            <div style={{ marginTop: 32 }}><CentralCoastCallout /></div>
           </div>
 
           {state === 'done' ? (

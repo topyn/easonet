@@ -63,6 +63,33 @@ export function PriceCard({ cta = true }: { cta?: boolean }) {
   )
 }
 
+// Central Coast businesses can start free on OzStorehouse and grow into a full website there.
+const OZ_SELLER_URL = 'https://www.ozstorehouse.com/become-a-seller?utm_source=easonet&utm_medium=referral&utm_campaign=cc_free_website'
+
+export function CentralCoastCallout() {
+  return (
+    <div className="mk-cc-wrap">
+      <div className="mk-cc">
+        <div className="mk-cc-pin" aria-hidden="true">📍</div>
+        <div className="mk-cc-text">
+          <h3 className="mk-h3">Are you a NSW Central Coast business? You may qualify for a free website.</h3>
+          <p>Start with a free store on OzStorehouse, the Central Coast's local marketplace, and grow it into a full website on your own domain.</p>
+        </div>
+        <a href={OZ_SELLER_URL} className="mk-btn mk-btn-ghost" target="_blank" rel="noopener">Start on OzStorehouse ↗</a>
+      </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .mk-cc-wrap { container-type: inline-size; }
+        .mk-cc { display: flex; align-items: center; gap: 20px; background: var(--teal-soft); border-radius: 18px; padding: 24px 28px; }
+        .mk-cc-pin { font-size: 28px; flex-shrink: 0; }
+        .mk-cc-text { flex: 1; }
+        .mk-cc-text p { color: var(--muted); margin-top: 6px; font-size: 16px; }
+        .mk-cc .mk-btn-ghost { border-color: var(--teal); color: var(--teal); background: #fff; }
+        @container (max-width: 720px) { .mk-cc { flex-direction: column; align-items: flex-start; padding: 22px 20px; } }
+      ` }} />
+    </div>
+  )
+}
+
 export function LiveExample() {
   return (
     <div className="mk-example">

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import MarketingLayout, { CtaBand, PRICE } from '../components/marketing/MarketingLayout'
-import { FAQ, FaqList, LiveExample, PriceCard } from '../components/marketing/content'
+import { CentralCoastCallout, FAQ, FaqList, LiveExample, PriceCard } from '../components/marketing/content'
 
 const FEATURES = [
   { icon: '🏠', title: 'A real website, not a page', text: 'Home, Shop, About, Contact, FAQ and Shipping & returns, all on your own domain and built from what you already know about your business.' },
@@ -137,6 +137,7 @@ export default function Home() {
           </div>
           <PriceCard />
         </div>
+        <div className="mk-wrap" style={{ marginTop: 48 }}><CentralCoastCallout /></div>
       </section>
 
       <section className="mk-section mk-section-alt">
