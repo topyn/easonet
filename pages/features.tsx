@@ -7,6 +7,9 @@ const GROUPS: { title: string; intro: string; items: { name: string; text: strin
     items: [
       { name: 'All the pages a shop needs', text: 'Home, Shop, About, Contact, FAQ and Shipping & returns, plus terms and privacy pages for your buyers.' },
       { name: 'Four looks', text: 'Pick a look, add your logo and colours. Change your mind any time without losing anything.' },
+      { name: 'Blog', text: 'Write news, how-tos and behind-the-scenes posts on your own site. Each post gets its own page, share card and spot in your sitemap, which helps Google find you.' },
+      { name: 'Find us at', text: 'List the markets, stalls, pop-ups and exhibitions you’ll be at, so local customers can come and see you.' },
+      { name: 'Your social posts', text: 'Show your latest Facebook and Instagram posts on your home page.' },
       { name: 'Announcement bar', text: 'Tell visitors about Christmas cut-offs, a sale or a new range across the top of every page.' },
       { name: 'Live preview', text: 'See your site on a phone and a computer as you edit, before anything goes live.' },
       { name: 'Search-ready', text: 'Set the titles and descriptions Google shows for your pages. Every page has a sitemap entry and a proper share card.' },
@@ -21,6 +24,8 @@ const GROUPS: { title: string; intro: string; items: { name: string; text: strin
       { name: 'Enquiries and offers', text: 'Customers can ask a question or make an offer, and you reply from one place.' },
       { name: 'Commission requests', text: 'If you make to order, customers can send you a custom request with all the details you need.' },
       { name: 'Payments straight to you', text: 'Customers pay through your own PayPal, or contact you to buy. We never hold your customers’ money.' },
+      { name: 'Cart and card checkout', text: 'Customers add several items to a cart and pay by card through your own Square account. The money goes straight to you, with no per-sale fee from us.', soon: true },
+      { name: 'Bring your shop across', text: 'Already selling on GoDaddy or Shopify? Import your products and photos in a few clicks, so you don’t start from scratch.' },
       { name: 'Share cards', text: 'Every product shares nicely on Facebook and messaging apps, with its photo and price.' },
     ],
   },
@@ -32,6 +37,17 @@ const GROUPS: { title: string; intro: string; items: { name: string; text: strin
       { name: 'Live checker', text: 'Each step turns green as it starts working, so you know when your site is ready.' },
       { name: 'Secure by default', text: 'Your site is served over https automatically. No certificates to buy or renew.' },
       { name: 'Preview before go-live', text: 'Check your site privately before you point your domain at it.' },
+    ],
+  },
+  {
+    title: 'Email on your domain',
+    intro: 'Look like a real business: email at the address on your website.',
+    items: [
+      { name: 'Up to three addresses', text: 'Choose addresses like sales@ or orders@ on your own domain. We set up everything behind the scenes.' },
+      { name: 'One simple inbox', text: 'All your shop’s email in one place that works on your phone and your computer.' },
+      { name: 'Copy to your personal email', text: 'Optionally get a copy of every email in Gmail, Outlook or your phone’s mail app, so you never miss a customer.' },
+      { name: 'Scam warnings', text: 'Emails that fail the sender’s own security checks are clearly flagged, so fake invoices and payment requests stand out.' },
+      { name: 'Reply from your own address', text: 'Send and reply as sales@yourshop.com.au, straight from the inbox.', soon: true },
     ],
   },
   {
@@ -59,7 +75,7 @@ export default function Features() {
     <MarketingLayout
       path="/features"
       title="Features | easonet"
-      description={`Everything included in an easonet shop: website on your own domain, product pages, enquiries, self-serve domain connection, visit stats and a shop-owner community. ${PRICE}/month.`}
+      description={`Everything included in an easonet shop: website on your own domain, product pages, blog, enquiries, email on your own domain, self-serve domain connection, visit stats and a shop-owner community. ${PRICE}/month.`}
     >
       <style dangerouslySetInnerHTML={{ __html: `
         .ft-group { display: grid; grid-template-columns: 300px 1fr; gap: 48px; padding: 56px 0; border-top: 1px solid var(--line); }
