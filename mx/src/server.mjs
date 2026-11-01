@@ -77,7 +77,7 @@ export function createMxServer({ config, client, addressBook, resolver, logger =
     logger: false,
     socketTimeout: 60_000,
     closeTimeout: 30_000,
-    maxClients: 200,
+    maxClients: config.maxClients, // each can buffer up to maxMessageBytes; sized to the box's RAM
 
     // One log line per connection and per rejection, so "my email never arrived" can be traced.
     onConnect(session, callback) {
@@ -111,11 +111,17 @@ export function createMxServer({ config, client, addressBook, resolver, logger =
     },
 
     onData(stream, session, callback) {
+      // smtp-server keeps streaming past SIZE and only flags it at the end, so stop buffering
+      // once over the limit — otherwise one sender could fill the box's memory.
       const chunks = []
-      stream.on('data', c => chunks.push(c))
+      let bytes = 0
+      stream.on('data', c => {
+        bytes += c.length
+        if (bytes <= config.maxMessageBytes) chunks.push(c)
+      })
       stream.on('error', err => callback(err))
       stream.on('end', () => {
-        if (stream.sizeExceeded) {
+        if (stream.sizeExceeded || bytes > config.maxMessageBytes) {
           logger.log(`[reject] 552 too-big ip=${session.remoteAddress}`)
           return callback(smtpError(552, '5.3.4 Message too big'))
         }

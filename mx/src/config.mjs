@@ -20,6 +20,7 @@ export function loadConfig(env = process.env) {
     secret,
     maxMessageBytes: Number(env.MAX_MESSAGE_BYTES || 25 * 1024 * 1024),
     maxRecipients: Number(env.MAX_RECIPIENTS || 50),
+    maxClients: Number(env.MAX_CLIENTS || 20),          // concurrent SMTP sessions (1 GB box)
     addressRefreshMs: Number(env.ADDRESS_REFRESH_MS || 60_000),
     tlsKeyPath: env.TLS_KEY_PATH || '',
     tlsCertPath: env.TLS_CERT_PATH || '',

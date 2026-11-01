@@ -4,6 +4,14 @@ services:
     container_name: easonet-mx
     restart: unless-stopped
     env_file: .env
+    # Least privilege: read-only filesystem, no Linux capabilities, no privilege escalation,
+    # and a memory cap so a flood restarts the container instead of starving the host.
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 700m
+    pids_limit: 200
     ports:
       - "25:2525"          # SMTP from the internet
       - "127.0.0.1:8025:8025"  # health, local only (put a reverse proxy or the monitor's agent in front)
