@@ -1,0 +1,22 @@
+{
+  "name": "easonet-mx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Inbound-only mail server for seller domains hosted by easonet (mx1/mx2.easonet.com)",
+  "type": "module",
+  "main": "src/index.mjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "mailauth": "7.3.0",
+    "smtp-server": "3.19.23"
+  },
+  "devDependencies": {
+    "nodemailer": "10.1.2"
+  }
+}

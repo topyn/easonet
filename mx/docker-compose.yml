@@ -1,0 +1,24 @@
+services:
+  mx:
+    build: .
+    container_name: easonet-mx
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "25:2525"          # SMTP from the internet
+      - "127.0.0.1:8025:8025"  # health, local only (put a reverse proxy or the monitor's agent in front)
+    volumes:
+      # Let's Encrypt certificate for MX_HOSTNAME. certbot runs on the host; its deploy hook
+      # (deploy/certbot-deploy-hook.sh) copies the cert here readable by the container's `node`
+      # user (uid 1000) — /etc/letsencrypt keys are root-only — then sends SIGHUP so the server
+      # reloads it without dropping connections.
+      - /opt/easonet-mx/tls:/tls:ro
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  # Spam scoring (phase 1b). Uncomment, then set RSPAMD_URL=http://rspamd:11333 in .env.
+  # Check the current image name/tag on Docker Hub before enabling.
+  # rspamd:
+  #   image: rspamd/rspamd:latest
+  #   restart: unless-stopped

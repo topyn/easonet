@@ -23,6 +23,7 @@ model User {
   stores            Store[]
   brandPages        BrandPage[]
   blockedSenders    BlockedSender[]
+  mailDomains       MailDomain[]
 }
 
 model Identity {
@@ -34,6 +35,10 @@ model Identity {
   domain       String
   color        String    @default("#534AB7")
   signature    String?   @db.Text
+  // Seller-domain mail (docs/specs/seller-domain-email-spec-2026-10-31.md in the ozstorehouse
+  // repo): active | retiring (renamed, still receives until retiresAt) | system (postmaster/abuse)
+  status       String    @default("active")
+  retiresAt    DateTime?
   dnsVerified  Boolean   @default(false)
   smtpHost     String
   smtpPort     Int       @default(587)
@@ -220,4 +225,36 @@ model BrandPage {
   contactSub    String?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
+}
+
+// A seller domain whose mail we host on our own MX servers (mx1/mx2.easonet.com). Identities on
+// this domain are the seller's chosen addresses; the MX servers pull the list via
+// /api/mail/address-list and reject anything else at RCPT time.
+model MailDomain {
+  id             String   @id @default(cuid())
+  domain         String   @unique // lowercased, no trailing dot
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  ozAccountId    String?  // OzStorehouse seller this domain belongs to, when there is one
+  dnsMode        String   @default("manual") // manual | vercel
+  inboundEnabled Boolean  @default(false)    // MX servers accept mail for it
+  mxVerified     Boolean  @default(false)
+  catchAll       Boolean  @default(false)    // unknown local parts go to the first active address
+  dailySendCap   Int      @default(100)
+  sendingPaused  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+// One row per (raw message, envelope recipient) delivered by our MX servers, so a retried
+// delivery never creates a second copy.
+model InboundReceipt {
+  id          String   @id @default(cuid())
+  rawSha256   String
+  envelopeTo  String
+  storagePath String
+  threadId    String?
+  result      String   // stored | spam | rejected
+  receivedAt  DateTime @default(now())
+
+  @@unique([rawSha256, envelopeTo])
 }
