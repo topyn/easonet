@@ -244,6 +244,10 @@ model MailDomain {
   catchAll       Boolean  @default(false)    // unknown local parts go to the first active address
   dailySendCap   Int      @default(100)
   sendingPaused  Boolean  @default(false)
+  // Optional copy of every non-spam inbound email to the seller's personal address. Only sent
+  // once confirmed (forwardCopyVerifiedAt) — see lib/inbound/forwardCopy.ts.
+  forwardCopyTo         String?
+  forwardCopyVerifiedAt DateTime?
   createdAt      DateTime @default(now())
 }
 

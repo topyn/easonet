@@ -7,6 +7,7 @@ import { verifyMailRequest } from '../../../lib/inbound/signature'
 import { rawStorage } from '../../../lib/inbound/raw'
 import { resolveRecipient } from '../../../lib/inbound/routing'
 import { storeInboundEmail } from '../../../lib/inbound/store'
+import { canForwardCopy, sendForwardCopy } from '../../../lib/inbound/forwardCopy'
 
 // MX server → easonet, after uploading the raw message: file it for each envelope recipient.
 // The MX server only answers "250 OK" to the sending server once this returns 200, so any
@@ -58,6 +59,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const parsed = await simpleParser(eml)
     const markSpam = body.spam?.action === 'spam'
     const results: Result[] = []
+    // Domains already sent a personal-email copy of this message (one copy even if it was
+    // addressed to two of the seller's addresses).
+    const copiedDomains = new Set<string>()
 
     for (const rcptRaw of Array.from(new Set(body.rcptTo.map(r => r.toLowerCase())))) {
       const key = { rawSha256: body.sha256, envelopeTo: rcptRaw }
@@ -100,6 +104,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           data: { threadId, result: spam ? 'spam' : 'stored' },
         })
         results.push({ rcpt: rcptRaw, result: spam ? 'spam' : 'stored', threadId })
+
+        // Optional copy to the seller's personal email. Best effort: the message is already
+        // safely in the inbox, so a failed copy must not make the MX server retry.
+        if (!spam && !copiedDomains.has(identity.domain)) {
+          copiedDomains.add(identity.domain)
+          try {
+            const mailDomain = await prisma.mailDomain.findUnique({ where: { domain: identity.domain } })
+            if (mailDomain && canForwardCopy(mailDomain, parsed)) await sendForwardCopy({ parsed, identity, mailDomain, auth })
+          } catch (err: any) {
+            console.error('MAIL forward copy failed:', err?.message)
+          }
+        }
       } catch (e) {
         // Release the claim so the MX server's retry can deliver it.
         await prisma.inboundReceipt.delete({ where: { rawSha256_envelopeTo: key } }).catch(() => {})
