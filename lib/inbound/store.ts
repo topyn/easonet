@@ -98,9 +98,16 @@ export async function storeInboundEmail(opts: {
       },
     })
   } else {
+    // New mail on an existing conversation brings it back to the inbox as unread — otherwise a
+    // customer's reply to an archived (or already-read) thread is easy to miss. Spam stays put:
+    // a spam thread isn't resurrected, and spam mail doesn't reopen a good thread.
+    const resurface = !spam && thread.status !== 'spam'
     await prisma.thread.update({
       where: { id: thread.id },
-      data: { lastAt: new Date() },
+      data: {
+        lastAt: new Date(),
+        ...(resurface ? { read: false, ...(thread.status === 'archived' ? { status: 'open' } : {}) } : {}),
+      },
     })
   }
 
