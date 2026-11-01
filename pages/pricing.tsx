@@ -1,10 +1,20 @@
-import MarketingLayout, { CtaBand, PRICE } from '../components/marketing/MarketingLayout'
-import { CentralCoastCallout, FaqList, PriceCard } from '../components/marketing/content'
+import MarketingLayout, { CtaBand, PRICE, PRICE_AUD } from '../components/marketing/MarketingLayout'
+import { CentralCoastCallout, FAQ, FaqList, INCLUDED, PriceCard } from '../components/marketing/content'
+
+// The plan and its price, and the FAQ, as schema.org markup (search engines and AI assistants).
+const SCHEMA = [
+  { '@context': 'https://schema.org', '@type': 'Service', name: 'easonet online shop', serviceType: 'Online shop and website on your own domain',
+    provider: { '@type': 'Organization', name: 'easonet', url: 'https://www.easonet.com' }, areaServed: 'AU', description: INCLUDED.join('; '),
+    offers: { '@type': 'Offer', price: PRICE_AUD, priceCurrency: 'AUD', url: 'https://www.easonet.com/pricing',
+      priceSpecification: { '@type': 'UnitPriceSpecification', price: PRICE_AUD, priceCurrency: 'AUD', unitText: 'month', referenceQuantity: { '@type': 'QuantitativeValue', value: 1, unitCode: 'MON' } } } },
+  { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
+]
 
 export default function Pricing() {
   return (
     <MarketingLayout
       path="/pricing"
+      jsonLd={SCHEMA}
       title="Pricing | easonet"
       description={`One plan: ${PRICE} a month for your shop on your own domain, with everything included and no lock-in.`}
     >

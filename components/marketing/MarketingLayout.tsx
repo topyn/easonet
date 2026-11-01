@@ -6,6 +6,18 @@ import { useState, type ReactNode } from 'react'
 // /register, /privacy). The logged-in tools (/app, /stores, ...) keep their own styling.
 
 export const PRICE = 'A$49.99'
+export const PRICE_AUD = '49.99'
+
+// www is the live host (the bare domain redirects to it), so canonicals and markup point there.
+const ORIGIN = 'https://www.easonet.com'
+
+// Who easonet is, on every marketing page — for search engines and AI assistants.
+const ORG_SCHEMA = [
+  { '@context': 'https://schema.org', '@type': 'Organization', name: 'easonet', url: ORIGIN, description: 'Online shops on their own domain for small Australian businesses, with email and a shop-owner community.', areaServed: 'AU', address: { '@type': 'PostalAddress', addressRegion: 'NSW', addressCountry: 'AU' }, email: 'mark@easonet.com' },
+  { '@context': 'https://schema.org', '@type': 'WebSite', name: 'easonet', url: ORIGIN, inLanguage: 'en-AU' },
+]
+
+const ldJson = (data: unknown) => ({ __html: JSON.stringify(data).replace(/</g, '\\u003c') })
 
 const NAV = [
   { href: '/features', label: 'Features' },
@@ -14,14 +26,15 @@ const NAV = [
   { href: '/pricing#faq', label: 'FAQ' },
 ]
 
-export default function MarketingLayout({ title, description, path, children }: {
+export default function MarketingLayout({ title, description, path, jsonLd, children }: {
   title: string
   description: string
   path: string
+  jsonLd?: object[]  // page-specific schema.org markup, on top of the Organization/WebSite
   children: ReactNode
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const url = `https://easonet.com${path}`
+  const url = `${ORIGIN}${path}`
 
   return (
     <>
@@ -35,8 +48,10 @@ export default function MarketingLayout({ title, description, path, children }: 
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:url" content={url} />
-        <meta property="og:image" content="https://easonet.com/showcase/example-desktop.jpg" />
+        <meta property="og:image" content={`${ORIGIN}/showcase/example-desktop.jpg`} />
         <meta name="twitter:card" content="summary_large_image" />
+        <link rel="alternate" type="text/plain" title="llms.txt" href={`${ORIGIN}/llms.txt`} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={ldJson([...ORG_SCHEMA, ...(jsonLd || [])])} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=DM+Sans:wght@400;500;600&family=Syne:wght@800&display=swap" rel="stylesheet" />

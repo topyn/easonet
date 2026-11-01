@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import MarketingLayout, { CtaBand, PRICE } from '../components/marketing/MarketingLayout'
-import { CentralCoastCallout, FAQ, FaqList, LiveExample, PriceCard } from '../components/marketing/content'
+import { CentralCoastCallout, FAQ, FaqList, LiveExample, PriceCard, STEPS } from '../components/marketing/content'
 
 const FEATURES = [
   { icon: '🏠', title: 'A real website, not a page', text: 'Home, Shop, About, Contact, FAQ and Shipping & returns, all on your own domain and built from what you already know about your business.' },
@@ -11,11 +11,6 @@ const FEATURES = [
   { icon: '🤝', title: 'A community behind you', text: 'A shared forum and how-tos with other shop owners. Ask questions, share what works and grow together.' },
 ]
 
-const STEPS = [
-  { n: '1', title: 'Pick a look', text: 'Choose one of four looks, add your logo, colours and a short story about you. Add your products with photos and prices.' },
-  { n: '2', title: 'Connect your domain', text: 'Add two records where you bought your domain. The live checker shows each step turning green.' },
-  { n: '3', title: 'Go live', text: 'Preview on phone and computer, then switch it on. Your shop is open on your own address.' },
-]
 
 export default function Home() {
   return (

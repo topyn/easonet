@@ -1,0 +1,13 @@
+# easonet.com — search engines and AI assistants are welcome on the public pages.
+# Markdown versions: request any page with Accept: text/markdown. Summary: /llms.txt
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /app
+Disallow: /setup
+Disallow: /stores
+Disallow: /waitlists
+Disallow: /brandpages
+Disallow: /dns-check
+
+Sitemap: https://www.easonet.com/sitemap.xml
