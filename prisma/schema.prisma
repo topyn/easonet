@@ -80,6 +80,8 @@ model Message {
   bodyText         String    @db.Text
   bodyHtml         String?   @db.Text
   rawMessageId     String?
+  // Inbound only: { spf, dkim, dmarc, source: "mx" | "cloudflare" } — see lib/inbound/auth.ts
+  authResults      Json?
   sentByIdentityId String?
   sentByIdentity   Identity? @relation("SentMessages", fields: [sentByIdentityId], references: [id])
   createdAt        DateTime  @default(now())

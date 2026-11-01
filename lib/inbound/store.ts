@@ -4,6 +4,7 @@ import type { ParsedMail } from 'mailparser'
 import { randomUUID } from 'crypto'
 import { prisma } from '../prisma'
 import { uploadAttachment, sanitizeFilename } from '../storage'
+import { type AuthResults, authFromCloudflareHeaders } from './auth'
 
 // Files one parsed inbound email under an identity: threading, blocked-sender handling,
 // message row and attachments. Shared by the Cloudflare webhook (/api/inbound/receive) and
@@ -31,6 +32,8 @@ export async function storeInboundEmail(opts: {
   identity: Identity
   /** Mark the thread as spam regardless of blocked senders (e.g. MX spam score). */
   markSpam?: boolean
+  /** Sender checks from our MX server; when absent, read Cloudflare's header (lib/inbound/auth). */
+  auth?: AuthResults | null
 }): Promise<{ threadId: string; spam: boolean }> {
   const { req, res, parsed, identity } = opts
   const toEmail = identity.email.toLowerCase()
@@ -122,6 +125,7 @@ export async function storeInboundEmail(opts: {
       bodyText: parsed.text ?? '',
       bodyHtml: parsed.html || null,
       rawMessageId: messageId,
+      authResults: opts.auth ?? authFromCloudflareHeaders(parsed) ?? undefined,
     },
   })
 

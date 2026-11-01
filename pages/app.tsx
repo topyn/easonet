@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 const OnboardingWizard = dynamic(() => import('../components/OnboardingWizard'), { ssr: false })
 import { authFetch, getToken, clearTokens, setTokens } from '../lib/auth-client'
 import DOMPurify from 'dompurify'
+import { type AuthResults, authWarning } from '../lib/inbound/auth'
 
 if (DOMPurify.isSupported) {
   // Force external links to open safely instead of trusting whatever target/rel a message brought with it
@@ -28,7 +29,7 @@ function sanitizeEmailHtml(html: string): string {
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
 interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean; signature?: string | null }
 interface AttachmentMeta { id: string; filename: string; mimeType: string; size: number }
-interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; _count?: { attachments: number } }
+interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; authResults?: AuthResults | null; _count?: { attachments: number } }
 interface StagedAttachment { path?: string; attachmentId?: string; filename: string; mimeType: string; size: number }
 interface Thread { id: string; subject: string; lastAt: string; read: boolean; status: string; participants: string[]; identity: Identity; messages: Message[] }
 interface DnsResult { mx: boolean; spf: boolean }
@@ -913,6 +914,24 @@ export default function App() {
                             {m.direction === 'outbound' ? `you (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}
                             {m.ccAddress && <> · cc: {m.ccAddress}</>}
                           </div>
+                          {m.direction === 'inbound' && (() => {
+                            const warning = authWarning(m.authResults)
+                            if (!warning) return null
+                            const a = m.authResults!
+                            const domain = m.fromAddress.match(/@([\w.-]+\.\w+)/)?.[1]
+                            return (
+                              <div
+                                title={`Sender checks — SPF: ${a.spf ?? 'none'}, DKIM: ${a.dkim ?? 'none'}, DMARC: ${a.dmarc ?? 'none'}`}
+                                style={{ maxWidth: '70%', marginBottom: 6, padding: '6px 10px', borderRadius: 7, fontSize: 12, lineHeight: 1.5, fontFamily: "'DM Mono', monospace", ...(warning === 'forged'
+                                  ? { background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.45)', color: '#e0776b' }
+                                  : { background: 'rgba(212,160,23,0.10)', border: '1px solid rgba(212,160,23,0.4)', color: '#d4a017' }) }}
+                              >
+                                {warning === 'forged'
+                                  ? `⚠ This may not really be from ${domain ?? 'this sender'}: it failed the domain's own sender checks. Don't click links or send money or details.`
+                                  : `⚠ Unverified sender: we couldn't confirm this came from ${domain ?? 'this sender'}. Be careful with links and payment requests.`}
+                              </div>
+                            )
+                          })()}
                           <div style={{ maxWidth: '70%', background: m.direction === 'outbound' ? ACCENT : BG3, color: TEXT, padding: '12px 16px', borderRadius: m.direction === 'outbound' ? '12px 12px 4px 12px' : '12px 12px 12px 4px', fontSize: 14, lineHeight: 1.6, border: m.direction === 'outbound' ? 'none' : `1px solid ${BORDER}` }}>
                             {m.bodyHtml
                               ? <div className="rte-body" dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(m.bodyHtml) }} />

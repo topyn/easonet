@@ -93,7 +93,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       try {
-        const { threadId, spam } = await storeInboundEmail({ req, res, parsed, identity, markSpam })
+        const auth = body.auth ? { ...body.auth, source: 'mx' as const } : null
+        const { threadId, spam } = await storeInboundEmail({ req, res, parsed, identity, markSpam, auth })
         await prisma.inboundReceipt.update({
           where: { rawSha256_envelopeTo: key },
           data: { threadId, result: spam ? 'spam' : 'stored' },
