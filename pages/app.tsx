@@ -26,8 +26,18 @@ function sanitizeEmailHtml(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS: EMAIL_HTML_ALLOWED_TAGS, ALLOWED_ATTR: EMAIL_HTML_ALLOWED_ATTR })
 }
 
+// '"Jane Customer" <jane@example.org>' → 'Jane Customer'; a bare address stays as it is.
+function senderName(from: string): string {
+  const name = from.replace(/<[^>]*>/, '').trim().replace(/^["']+|["']+$/g, '').trim()
+  return name || from.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] || from
+}
+
+// Australian order and month names: "1 Nov 2026" / "1 Nov 2026, 9:55 pm".
+function formatDay(d: string): string { return new Date(d).toLocaleDateString('en-AU', { dateStyle: 'medium' }) }
+function formatDateTime(d: string): string { return new Date(d).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) }
+
 interface User { id: string; email: string; plan: string; trialEndsAt: string | null }
-interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean; signature?: string | null }
+interface Identity { id: string; name: string; email: string; domain: string; color: string; dnsVerified: boolean; signature?: string | null; hosted?: boolean }
 interface AttachmentMeta { id: string; filename: string; mimeType: string; size: number }
 interface Message { id: string; direction: string; fromAddress: string; toAddress: string; ccAddress?: string | null; bccAddress?: string | null; bodyText: string; bodyHtml?: string; createdAt: string; attachments?: AttachmentMeta[]; authResults?: AuthResults | null; _count?: { attachments: number } }
 interface StagedAttachment { path?: string; attachmentId?: string; filename: string; mimeType: string; size: number }
@@ -301,6 +311,10 @@ export default function App() {
   const [hasDraft, setHasDraft] = useState(false)
   const [composeSyncToken, setComposeSyncToken] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Seller mode: every address is on a shop domain whose mail we host (pilot sellers). They get a
+  // plain inbox — no identity/DNS setup, power-user tools or trial/plan nags meant for easonet's
+  // own self-serve users.
+  const sellerMode = identities.length > 0 && identities.every(i => i.hosted)
   const [updateAvailable, setUpdateAvailable] = useState(false)
 
   useEffect(() => {
@@ -491,7 +505,7 @@ export default function App() {
   function forwardMessage(m: Message) {
     if (!activeThread) return
     const quotedBody = m.bodyHtml ? sanitizeEmailHtml(m.bodyHtml) : escapeHtml(m.bodyText).replace(/\n/g, '<br>')
-    const quoted = `<br><br>---------- Forwarded message ----------<br>From: ${escapeHtml(m.fromAddress)}<br>Date: ${escapeHtml(new Date(m.createdAt).toLocaleString())}<br>Subject: ${escapeHtml(activeThread.subject)}<br>To: ${escapeHtml(m.toAddress)}${m.ccAddress ? `<br>Cc: ${escapeHtml(m.ccAddress)}` : ''}<br><br>${quotedBody}`
+    const quoted = `<br><br>---------- Forwarded message ----------<br>From: ${escapeHtml(m.fromAddress)}<br>Date: ${escapeHtml(formatDateTime(m.createdAt))}<br>Subject: ${escapeHtml(activeThread.subject)}<br>To: ${escapeHtml(m.toAddress)}${m.ccAddress ? `<br>Cc: ${escapeHtml(m.ccAddress)}` : ''}<br><br>${quotedBody}`
     setComposeIdentityId(activeThread.identity.id)
     setComposeTo('')
     setComposeCc('')
@@ -679,7 +693,21 @@ export default function App() {
         .rte-body ul, .rte-body ol { padding-left: 20px; }
         .app-hamburger { display: none; }
         .app-sidebar-backdrop { display: none; }
+        /* dvh = the visible height on phones (100vh runs under iOS Safari's toolbar, hiding the reply box) */
+        .app-root { height: 100vh; height: 100dvh; }
         @media (max-width: 768px) {
+          /* 16px stops iOS zooming the page whenever a field is tapped */
+          input, textarea, select, [contenteditable] { font-size: 16px !important; }
+          .app-toolbar { flex-wrap: wrap; padding: 10px 12px !important; gap: 8px !important; }
+          .app-toolbar-title > div { font-size: 15px !important; }
+          .app-toolbar-signout { display: none !important; }
+          .app-toolbar .app-search-input { order: 10; flex: 1 1 100%; width: auto !important; }
+          .app-thread-header { flex-wrap: wrap; padding: 10px 12px !important; gap: 8px !important; }
+          .app-thread-subject { flex: 1 1 calc(100% - 70px) !important; font-size: 14px !important; }
+          .app-messages { padding: 14px 12px !important; }
+          .app-messages > div > div { max-width: 92% !important; }
+          .app-reply { padding: 10px 12px !important; }
+          .app-thread-row { padding: 12px 14px !important; gap: 10px !important; }
           .app-sidebar {
             position: fixed;
             top: 0; bottom: 0; left: 0;
@@ -692,11 +720,10 @@ export default function App() {
           .app-hamburger { display: flex !important; }
           .app-sidebar-backdrop.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 39; }
           .app-compose-panel { width: 100vw !important; right: 0 !important; left: 0 !important; bottom: 0 !important; border-radius: 0 !important; max-height: 85vh; }
-          .app-search-input { width: 120px !important; }
         }
       `}</style>
 
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'DM Sans', sans-serif", background: BG, color: TEXT, overflow: 'hidden' }}>
+      <div className="app-root" style={{ display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", background: BG, color: TEXT, overflow: 'hidden' }}>
 
         {/* Update available banner */}
         {updateAvailable && (
@@ -707,7 +734,7 @@ export default function App() {
         )}
 
         {/* Trial banner */}
-        {user && <TrialBanner plan={user.plan} trialEndsAt={user.trialEndsAt} identityCount={identities.length} />}
+        {user && !sellerMode && <TrialBanner plan={user.plan} trialEndsAt={user.trialEndsAt} identityCount={identities.length} />}
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
 
@@ -725,7 +752,7 @@ export default function App() {
             {/* Identities */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
               <div style={{ padding: '0 16px', marginBottom: 10 }}>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>// identities</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>{sellerMode ? '// your addresses' : '// identities'}</div>
 
                 {/* All inboxes */}
                 <div
@@ -773,7 +800,7 @@ export default function App() {
                       onClick={e => { e.stopPropagation(); setEditingSignatureIdentity(id); setSignatureDraft(id.signature ?? '') }}
                       style={{ border: 'none', background: 'none', color: '#333', cursor: 'pointer', fontSize: 11, padding: '2px 4px', flexShrink: 0 }}
                     >✎</button>
-                    {!id.dnsVerified && (
+                    {!id.dnsVerified && !id.hosted && (
                       <div
                         title="DNS not verified"
                         onClick={e => { e.stopPropagation(); setWizardIdentity(id) }}
@@ -783,17 +810,17 @@ export default function App() {
                   </div>
                 ))}
 
-                <button
+                {!sellerMode && <button
                   onClick={() => setAddingIdentity(true)}
                   style={{ width: '100%', textAlign: 'left', padding: '7px 10px', fontSize: 11, color: '#333', border: 'none', background: 'none', cursor: 'pointer', fontFamily: "'DM Mono', monospace", letterSpacing: '.03em' }}
                 >
                   + add identity
-                </button>
+                </button>}
               </div>
             </div>
 
             {/* Tools nav */}
-            <div style={{ padding: '8px 16px', borderTop: `1px solid ${BORDER}` }}>
+            {!sellerMode && <div style={{ padding: '8px 16px', borderTop: `1px solid ${BORDER}` }}>
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>// tools</div>
               <a href="/waitlists" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ECF8E', flexShrink: 0 }} />
@@ -816,16 +843,16 @@ export default function App() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F5A623', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>dns checker</div>
               </a>
-            </div>
+            </div>}
 
             {/* User row */}
             <div style={{ padding: '12px 16px', borderTop: `1px solid ${BORDER}` }}>
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{user?.email}</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              {!sellerMode && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: user?.plan === 'trial' ? '#F5A623' : '#3ECF8E', background: user?.plan === 'trial' ? 'rgba(245,166,35,0.1)' : 'rgba(62,207,142,0.1)', border: `1px solid ${user?.plan === 'trial' ? 'rgba(245,166,35,0.2)' : 'rgba(62,207,142,0.2)'}`, padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase' as const, letterSpacing: '.08em' }}>
                   {user?.plan === 'trial' ? 'trial' : user?.plan}
                 </div>
-              </div>
+              </div>}
               <button onClick={logout} style={{ width: '100%', padding: '7px 0', fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED, border: `1px solid ${BORDER}`, borderRadius: 7, background: 'transparent', cursor: 'pointer' }}>Sign out</button>
             </div>
           </div>
@@ -847,13 +874,13 @@ export default function App() {
             {!wizardIdentity && (
               <>
                 {/* Toolbar */}
-                <div style={{ display: 'flex', alignItems: 'center', padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, gap: 10, flexShrink: 0 }}>
+                <div className="app-toolbar" style={{ display: 'flex', alignItems: 'center', padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, gap: 10, flexShrink: 0 }}>
                   <button
                     className="app-hamburger"
                     onClick={() => setSidebarOpen(true)}
                     style={{ padding: '6px 10px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, flexShrink: 0 }}
                   >☰</button>
-                  <div style={{ flex: 1 }}>
+                  <div className="app-toolbar-title" style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: -0.5, color: TEXT }}>
                       {folder === 'archived' ? 'Archived' : folder === 'spam' ? 'Spam' : activeIdentityId ? identities.find(i => i.id === activeIdentityId)?.name ?? 'Inbox' : 'All inboxes'}
                     </div>
@@ -873,15 +900,15 @@ export default function App() {
                     <button onClick={resumeDraft} title="Resume your saved draft" style={{ padding: '7px 14px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: ACCENT, fontFamily: "'DM Mono', monospace" }}>Resume draft</button>
                   )}
                   <button onClick={openCompose} title="Compose (c)" style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
-                  <button onClick={logout} title="Sign out" style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>⏻</button>
+                  <button className="app-toolbar-signout" onClick={logout} title="Sign out" style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>⏻</button>
                 </div>
 
                 {/* Thread detail */}
                 {activeThread ? (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="app-thread-header" style={{ padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', gap: 12 }}>
                       <button onClick={() => setActiveThread(null)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: ACCENT, border: 'none', background: 'none', cursor: 'pointer' }}>← back</button>
-                      <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: -0.3, flex: 1 }}>{activeThread.subject}</span>
+                      <span className="app-thread-subject" style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: -0.3, flex: 1 }}>{activeThread.subject}</span>
                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: activeThread.identity?.color, padding: '3px 10px', border: `1px solid ${activeThread.identity?.color}33`, borderRadius: 100 }}>{activeThread.identity?.name}</span>
                       <button
                         onClick={() => markThreadUnread(activeThread.id)}
@@ -907,11 +934,15 @@ export default function App() {
                         style={{ padding: '5px 12px', border: `1px solid ${activeThread.status === 'spam' ? 'rgba(192,57,43,0.4)' : BORDER}`, borderRadius: 7, fontSize: 11, cursor: threadActionBusy ? 'not-allowed' : 'pointer', background: 'transparent', color: activeThread.status === 'spam' ? '#e0776b' : MUTED, fontFamily: "'DM Mono', monospace" }}
                       >{activeThread.status === 'spam' ? 'Not spam' : 'Mark as spam'}</button>
                     </div>
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div className="app-messages" style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {(activeThread.messages ?? []).map(m => (
                         <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: m.direction === 'outbound' ? 'flex-end' : 'flex-start' }}>
                           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: MUTED, marginBottom: 6 }}>
-                            {m.direction === 'outbound' ? `you (${m.fromAddress})` : m.fromAddress} · {new Date(m.createdAt).toLocaleString()}
+                            {m.direction === 'outbound' ? `you (${m.fromAddress})` : (() => {
+                              const name = senderName(m.fromAddress)
+                              const addr = m.fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]
+                              return addr && addr.toLowerCase() !== name.toLowerCase() ? `${name} <${addr}>` : name
+                            })()} · {formatDateTime(m.createdAt)}
                             {m.ccAddress && <> · cc: {m.ccAddress}</>}
                           </div>
                           {m.direction === 'inbound' && (() => {
@@ -957,7 +988,7 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ padding: '16px 24px', borderTop: `1px solid ${BORDER}` }}>
+                    <div className="app-reply" style={{ padding: '16px 24px', borderTop: `1px solid ${BORDER}` }}>
                       {replyError && (
                         <div style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 7, color: '#ff6b6b', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{replyError}</div>
                       )}
@@ -1028,17 +1059,18 @@ export default function App() {
                     ) : visibleThreads.map(t => {
                       const lastMsg = t.messages?.[0]
                       const isUnread = !t.read
-                      const otherParty = lastMsg?.direction === 'inbound' ? lastMsg.fromAddress.replace(/<.*>/, '').trim() : (t.participants?.find(p => p !== t.identity?.email) ?? 'You')
+                      const otherParty = lastMsg?.direction === 'inbound' ? senderName(lastMsg.fromAddress) : (t.participants?.find(p => p !== t.identity?.email) ?? 'You')
                       // The raw sender address, always shown so a display name like "OzStorehouse"
                       // can't hide which address you're actually acting on (e.g. when marking spam).
                       const otherPartyEmail = (lastMsg?.direction === 'inbound'
                         ? lastMsg.fromAddress.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0]
                         : t.participants?.find(p => p !== t.identity?.email)) ?? ''
-                      const initials = otherParty.slice(0, 2).toUpperCase()
+                      const initials = otherParty.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase()
                       return (
                         <div
                           key={t.id}
                           onClick={() => openThread(t)}
+                          className="app-thread-row"
                           style={{ display: 'flex', gap: 14, padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isUnread ? 'rgba(255,255,255,0.015)' : 'transparent', alignItems: 'flex-start' }}
                           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
                           onMouseLeave={e => (e.currentTarget.style.background = isUnread ? 'rgba(255,255,255,0.015)' : 'transparent')}
@@ -1052,7 +1084,7 @@ export default function App() {
                                 {otherParty}
                                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: t.identity?.color, padding: '2px 8px', border: `1px solid ${(t.identity?.color ?? ACCENT)}30`, borderRadius: 100, marginLeft: 8 }}>{t.identity?.name}</span>
                               </span>
-                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap' }}>{new Date(t.lastAt).toLocaleDateString()}</span>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap' }}>{formatDay(t.lastAt)}</span>
                             </div>
                             {otherPartyEmail && otherPartyEmail.toLowerCase() !== otherParty.toLowerCase() && (
                               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 3 }}>{otherPartyEmail}</div>

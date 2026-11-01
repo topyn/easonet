@@ -31,7 +31,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           domain: true, color: true, dnsVerified: true, signature: true, createdAt: true,
         },
       })
-      return res.json(identities)
+      // hosted = an address on a seller domain whose mail we host (MailDomain). An inbox made up
+      // only of hosted addresses is a shop owner's, and the inbox hides the power-user tools.
+      const hostedDomains = new Set((await prisma.mailDomain.findMany({
+        where: { userId: dbUser.id },
+        select: { domain: true },
+      })).map(d => d.domain))
+      return res.json(identities.map(i => ({ ...i, hosted: hostedDomains.has(i.domain.toLowerCase()) })))
     }
 
     if (req.method === 'POST') {
