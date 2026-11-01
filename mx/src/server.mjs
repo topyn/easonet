@@ -41,7 +41,10 @@ export function createMxServer({ config, client, addressBook, resolver, logger =
     const auth = await checkAuth(message, { ip, helo, mailFrom, hostname: config.hostname, resolver })
     const spam = await checkSpam(message, { rspamdUrl: config.rspamdUrl, ip, helo, mailFrom, rcptTo, hostname: config.hostname })
     const decision = decide(auth, spam)
-    if (decision.verdict === 'reject' || decision.verdict === 'defer') throw smtpError(decision.code, decision.message)
+    if (decision.verdict === 'reject' || decision.verdict === 'defer') {
+      logger.log(`[reject] ${decision.code} data from=${mailFrom || '<>'} ip=${ip} spf=${auth.spf} dkim=${auth.dkim} dmarc=${auth.dmarc}/${auth.dmarcPolicy} spam=${spam?.action ?? '-'}`)
+      throw smtpError(decision.code, decision.message)
+    }
 
     const sha256 = createHash('sha256').update(message).digest('hex')
     try {
@@ -76,14 +79,17 @@ export function createMxServer({ config, client, addressBook, resolver, logger =
     closeTimeout: 30_000,
     maxClients: 200,
 
+    // One log line per connection and per rejection, so "my email never arrived" can be traced.
     onConnect(session, callback) {
       const now = Date.now()
       const recent = (recentConnections.get(session.remoteAddress) || []).filter(t => now - t < 60_000)
       recent.push(now)
       recentConnections.set(session.remoteAddress, recent)
       if (recent.length > config.connectionsPerMinutePerIp) {
+        logger.log(`[reject] 421 rate-limit ip=${session.remoteAddress}`)
         return callback(smtpError(421, '4.7.0 Too many connections, slow down'))
       }
+      logger.log(`[connect] ip=${session.remoteAddress} host=${session.clientHostname || '-'}`)
       callback()
     },
 
@@ -97,6 +103,7 @@ export function createMxServer({ config, client, addressBook, resolver, logger =
       }
       const verdict = addressBook.resolve(address.address)
       if (verdict === 'accept') return callback()
+      logger.log(`[reject] rcpt ${verdict} to=${address.address} from=${session.envelope.mailFrom?.address || '<>'} ip=${session.remoteAddress}`)
       if (verdict === 'not-ready') return callback(smtpError(451, '4.3.0 Mail system starting, try again later'))
       if (verdict === 'not-our-domain') return callback(smtpError(550, '5.7.1 Relaying denied'))
       if (verdict === 'invalid') return callback(smtpError(553, '5.1.3 Invalid recipient address'))
@@ -108,7 +115,10 @@ export function createMxServer({ config, client, addressBook, resolver, logger =
       stream.on('data', c => chunks.push(c))
       stream.on('error', err => callback(err))
       stream.on('end', () => {
-        if (stream.sizeExceeded) return callback(smtpError(552, '5.3.4 Message too big'))
+        if (stream.sizeExceeded) {
+          logger.log(`[reject] 552 too-big ip=${session.remoteAddress}`)
+          return callback(smtpError(552, '5.3.4 Message too big'))
+        }
         deliver({ message: Buffer.concat(chunks), session })
           .then(() => callback(null, 'Message accepted'))
           .catch(err => callback(err.responseCode ? err : smtpError(451, '4.3.0 Temporary problem, please try again later')))
