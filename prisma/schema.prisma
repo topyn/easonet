@@ -264,3 +264,28 @@ model InboundReceipt {
 
   @@unique([rawSha256, envelopeTo])
 }
+
+// Addresses SES reported as bouncing or complaining (lib/sesFeedback.ts, via SNS →
+// /api/ses/feedback). Anything sent through SES must skip these; SES's own account-level
+// suppression list blocks them too. One row per address, updated on every new event.
+model SuppressedAddress {
+  id           String   @id @default(cuid())
+  email        String   @unique // lowercased
+  reason       String   // bounce | complaint
+  detail       String?  // bounce type/subtype or complaint feedback type
+  sourceDomain String?  // the sending domain the event came from (MailDomain.domain)
+  events       Int      @default(1)
+  firstAt      DateTime @default(now())
+  lastAt       DateTime @default(now())
+}
+
+// Every SES bounce/complaint notification as received, for the per-domain rate checks.
+model SesFeedbackEvent {
+  id           String   @id // SNS MessageId — a retried delivery is ignored
+  type         String   // Bounce | Complaint
+  sourceDomain String?
+  recipients   String[]
+  createdAt    DateTime @default(now())
+
+  @@index([sourceDomain, createdAt])
+}
