@@ -11,7 +11,10 @@ import { prisma } from './prisma'
 //     for everything while the SES credentials aren't set.
 // Either way, addresses that have bounced or complained (SuppressedAddress) are never mailed,
 // and a sending domain paused for complaints/bounces (MailDomain.sendingPaused) can't send.
-export const SES_SMTP_HOST = 'email-smtp.ap-southeast-2.amazonaws.com'
+// SES's classic SMTP endpoint, or — for this account, where the SES console creates SMTP logins
+// as a Mail Manager authenticated ingress endpoint (user "inp-…", relays out via a
+// send-to-internet rule) — that endpoint's own host, set in SES_SMTP_HOST.
+export const SES_SMTP_HOST = process.env.SES_SMTP_HOST || 'email-smtp.ap-southeast-2.amazonaws.com'
 const SES_CONFIGURATION_SET = 'easonet-default'
 const sesDomains = () => (process.env.SES_SENDING_DOMAINS || 'easonet.com').split(',').map(d => d.trim().toLowerCase()).filter(Boolean)
 
