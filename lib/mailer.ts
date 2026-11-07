@@ -1,5 +1,37 @@
 import nodemailer from 'nodemailer'
 import { Identity } from '@prisma/client'
+import { prisma } from './prisma'
+
+// Outgoing mail goes one of two ways:
+//   - Amazon SES (Sydney) for identities on a domain verified in SES (SES_SENDING_DOMAINS,
+//     default easonet.com — production access granted 7 Nov 2026), once SES_SMTP_USER /
+//     SES_SMTP_PASS are set. Sends carry the "easonet-default" configuration set, so bounces and
+//     complaints come back through SNS (lib/sesFeedback.ts).
+//   - Brevo, as before, for every other identity (customer domains not yet verified in SES), or
+//     for everything while the SES credentials aren't set.
+// Either way, addresses that have bounced or complained (SuppressedAddress) are never mailed,
+// and a sending domain paused for complaints/bounces (MailDomain.sendingPaused) can't send.
+export const SES_SMTP_HOST = 'email-smtp.ap-southeast-2.amazonaws.com'
+const SES_CONFIGURATION_SET = 'easonet-default'
+const sesDomains = () => (process.env.SES_SENDING_DOMAINS || 'easonet.com').split(',').map(d => d.trim().toLowerCase()).filter(Boolean)
+
+export function sendsViaSes(identity: Pick<Identity, 'email'>): boolean {
+  const domain = identity.email.split('@')[1]?.toLowerCase() || ''
+  return !!process.env.SES_SMTP_USER && !!process.env.SES_SMTP_PASS && sesDomains().includes(domain)
+}
+
+export class SendBlockedError extends Error {}
+
+// Drops suppressed addresses from a comma-separated list; returns what's left and what was dropped.
+async function withoutSuppressed(list: string | undefined): Promise<{ kept: string | undefined; dropped: string[] }> {
+  const parts = String(list || '').split(',').map(x => x.trim()).filter(Boolean)
+  if (!parts.length) return { kept: undefined, dropped: [] }
+  const bare = (a: string) => (/<([^>]+)>/.exec(a)?.[1] || a).trim().toLowerCase()
+  const hits = await prisma.suppressedAddress.findMany({ where: { email: { in: parts.map(bare) } }, select: { email: true } })
+  const blocked = new Set(hits.map(h => h.email))
+  const kept = parts.filter(a => !blocked.has(bare(a)))
+  return { kept: kept.length ? kept.join(', ') : undefined, dropped: parts.filter(a => blocked.has(bare(a))) }
+}
 
 export interface MailAttachment {
   filename: string
@@ -21,25 +53,38 @@ export interface SendOptions {
 }
 
 export async function sendFromIdentity(opts: SendOptions) {
-  const { identity, to, cc, bcc, subject, text, html, attachments, inReplyTo, references } = opts
+  const { identity, subject, text, html, attachments, inReplyTo, references } = opts
 
+  const fromDomain = identity.email.split('@')[1]?.toLowerCase() || ''
+  const paused = await prisma.mailDomain.findFirst({ where: { domain: fromDomain, sendingPaused: true }, select: { id: true } })
+  if (paused) throw new SendBlockedError(`Sending from ${fromDomain} is paused after bounces or complaints. Contact easonet support.`)
+
+  const [to, cc, bcc] = await Promise.all([withoutSuppressed(opts.to), withoutSuppressed(opts.cc), withoutSuppressed(opts.bcc)])
+  const dropped = [...to.dropped, ...cc.dropped, ...bcc.dropped]
+  if (dropped.length) console.warn('mailer: skipped suppressed recipients', dropped)
+  if (!to.kept && !cc.kept && !bcc.kept) throw new SendBlockedError('Not sent: every recipient has bounced or complained before.')
+
+  const viaSes = sendsViaSes(identity)
   // Identities on the shared Brevo relay use easonet's key from env - it's never stored per row.
   const onBrevo = identity.smtpHost === BREVO_SMTP_HOST
-  const transporter = nodemailer.createTransport({
-    host: identity.smtpHost,
-    port: identity.smtpPort,
-    secure: identity.smtpPort === 465,
-    auth: {
-      user: onBrevo ? process.env.BREVO_SMTP_USER! : identity.smtpUser,
-      pass: onBrevo ? process.env.BREVO_SMTP_KEY! : identity.smtpPass,
-    },
-  })
+  const transporter = nodemailer.createTransport(viaSes
+    ? { host: SES_SMTP_HOST, port: 587, secure: false, auth: { user: process.env.SES_SMTP_USER!, pass: process.env.SES_SMTP_PASS! } }
+    : {
+        host: identity.smtpHost,
+        port: identity.smtpPort,
+        secure: identity.smtpPort === 465,
+        auth: {
+          user: onBrevo ? process.env.BREVO_SMTP_USER! : identity.smtpUser,
+          pass: onBrevo ? process.env.BREVO_SMTP_KEY! : identity.smtpPass,
+        },
+      })
 
   const info = await transporter.sendMail({
     from: `"${identity.name}" <${identity.email}>`,
-    to,
-    cc: cc || undefined,
-    bcc: bcc || undefined,
+    to: to.kept,
+    cc: cc.kept,
+    bcc: bcc.kept,
+    ...(viaSes && { headers: { 'X-SES-CONFIGURATION-SET': SES_CONFIGURATION_SET } }),
     subject,
     text,
     html: html || undefined,
