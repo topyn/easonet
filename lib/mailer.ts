@@ -64,27 +64,22 @@ export async function sendFromIdentity(opts: SendOptions) {
   if (dropped.length) console.warn('mailer: skipped suppressed recipients', dropped)
   if (!to.kept && !cc.kept && !bcc.kept) throw new SendBlockedError('Not sent: every recipient has bounced or complained before.')
 
-  const viaSes = sendsViaSes(identity)
   // Identities on the shared Brevo relay use easonet's key from env - it's never stored per row.
   const onBrevo = identity.smtpHost === BREVO_SMTP_HOST
-  const transporter = nodemailer.createTransport(viaSes
-    ? { host: SES_SMTP_HOST, port: 587, secure: false, auth: { user: process.env.SES_SMTP_USER!, pass: process.env.SES_SMTP_PASS! } }
-    : {
-        host: identity.smtpHost,
-        port: identity.smtpPort,
-        secure: identity.smtpPort === 465,
-        auth: {
-          user: onBrevo ? process.env.BREVO_SMTP_USER! : identity.smtpUser,
-          pass: onBrevo ? process.env.BREVO_SMTP_KEY! : identity.smtpPass,
-        },
-      })
-
-  const info = await transporter.sendMail({
+  const identityTransport = () => nodemailer.createTransport({
+    host: identity.smtpHost,
+    port: identity.smtpPort,
+    secure: identity.smtpPort === 465,
+    auth: {
+      user: onBrevo ? process.env.BREVO_SMTP_USER! : identity.smtpUser,
+      pass: onBrevo ? process.env.BREVO_SMTP_KEY! : identity.smtpPass,
+    },
+  })
+  const message = {
     from: `"${identity.name}" <${identity.email}>`,
     to: to.kept,
     cc: cc.kept,
     bcc: bcc.kept,
-    ...(viaSes && { headers: { 'X-SES-CONFIGURATION-SET': SES_CONFIGURATION_SET } }),
     subject,
     text,
     html: html || undefined,
@@ -92,8 +87,23 @@ export async function sendFromIdentity(opts: SendOptions) {
     // Threading headers - recipient mail client uses these to group replies
     ...(inReplyTo && { inReplyTo }),
     ...(references && { references }),
-  })
+  }
 
+  if (sendsViaSes(identity)) {
+    try {
+      const ses = nodemailer.createTransport({ host: SES_SMTP_HOST, port: 587, secure: false, auth: { user: process.env.SES_SMTP_USER!, pass: process.env.SES_SMTP_PASS! } })
+      const info = await ses.sendMail({ ...message, headers: { 'X-SES-CONFIGURATION-SET': SES_CONFIGURATION_SET } })
+      return info.messageId
+    } catch (e: any) {
+      // SES couldn't be reached or refused our login (not the recipient): don't lose the email,
+      // send it the old way and shout in the logs. Anything else (a rejected message) is thrown.
+      const ours = e?.code === 'EAUTH' || e?.code === 'ECONNECTION' || e?.code === 'ETIMEDOUT' || e?.code === 'ESOCKET'
+      if (!ours) throw e
+      console.error('mailer: SES failed, falling back to the identity relay', e?.code, e?.response || e?.message)
+    }
+  }
+
+  const info = await identityTransport().sendMail(message)
   return info.messageId
 }
 
