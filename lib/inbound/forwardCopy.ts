@@ -11,6 +11,11 @@ import { splitAddress } from './routing'
 // easonet inbox; the copy is a heads-up the seller can read in Gmail/Outlook/their phone. It's
 // sent from our own address via Brevo (forwarding the original as-is would fail the sender's
 // SPF/DMARC), with Reply-To set to the customer.
+//
+// The copy is delivered to the personal address (SMTP envelope) but its To header is the shop
+// address, e.g. hello@inkedcreations.com.au. A seller who has added that address to Gmail's
+// "Send mail as" then gets it picked automatically on reply (Gmail's default "reply from the
+// same address the message was sent to"), while their personal mail keeps replying as Gmail.
 
 // Copies carry this header; inbound mail that has it is never copied again, so two domains
 // copying to each other can't loop.
@@ -72,9 +77,11 @@ export async function sendForwardCopy(opts: {
     port: 587,
     auth: { user: process.env.BREVO_SMTP_USER!, pass: process.env.BREVO_SMTP_KEY! },
   })
+  const copyFrom = process.env.MAIL_COPY_FROM || 'mark@easonet.com'
   await transporter.sendMail({
-    from: { name: `${senderLabel} via ${identity.email}`, address: process.env.MAIL_COPY_FROM || 'mark@easonet.com' },
-    to,
+    from: { name: `${senderLabel} via ${identity.email}`, address: copyFrom },
+    to: identity.email,
+    envelope: { from: copyFrom, to },
     replyTo: sender?.address ? { name: sender.name || '', address: sender.address } : undefined,
     subject,
     text,
