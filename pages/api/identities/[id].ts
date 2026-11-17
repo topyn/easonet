@@ -4,7 +4,7 @@ import { prisma } from '../../../lib/prisma'
 import { getUser } from '../../../lib/supabase-server'
 
 const PatchSchema = z.object({
-  signature: z.string().max(2000).nullable().optional(),
+  signature: z.string().max(6000).nullable().optional(), // HTML since Nov 2026 (links, shop logo)
 })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

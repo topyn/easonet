@@ -17,8 +17,20 @@ if (DOMPurify.isSupported) {
   })
 }
 
-const EMAIL_HTML_ALLOWED_TAGS = ['b', 'i', 'u', 'em', 'strong', 'a', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3']
-const EMAIL_HTML_ALLOWED_ATTR = ['href']
+// Images are allowed for one thing only: a shop logo in a signature, hosted on OzStorehouse's own
+// image proxy. Any other src is dropped, so mail can't load remote images (tracking pixels).
+const SHOP_LOGO_PREFIX = 'https://www.ozstorehouse.com/img/'
+if (DOMPurify.isSupported) {
+  DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+    if (node.tagName === 'IMG' && data.attrName === 'src' && !data.attrValue.startsWith(SHOP_LOGO_PREFIX)) data.keepAttr = false
+  })
+  DOMPurify.addHook('afterSanitizeAttributes', node => {
+    if (node.tagName === 'IMG' && !node.getAttribute('src')) node.parentNode?.removeChild(node)
+  })
+}
+
+const EMAIL_HTML_ALLOWED_TAGS = ['b', 'i', 'u', 'em', 'strong', 'a', 'br', 'p', 'div', 'span', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3', 'img']
+const EMAIL_HTML_ALLOWED_ATTR = ['href', 'src', 'alt', 'width']
 
 // Inbound mail is fully untrusted; outbound is our own contentEditable output, which can still
 // carry pasted-in HTML from elsewhere - both get sanitized the same way before ever rendering.
@@ -46,14 +58,85 @@ interface DnsResult { mx: boolean; spf: boolean }
 
 const COLORS = ['#7B6EF6','#3ECF8E','#F5A623','#60A5FA','#F87171','#A78BFA','#34D399']
 
-const BG = '#080808'
-const BG2 = '#101010'
-const BG3 = '#161616'
-const BORDER = 'rgba(255,255,255,0.07)'
-const BORDER2 = 'rgba(255,255,255,0.12)'
-const TEXT = '#f0f0ee'
-const MUTED = '#666'
+// Colours are CSS variables so the inbox can be light (the default, Nov 2026: shop owners found
+// the dark-only look hard to read) or dark. THEME_CSS defines both; the toolbar ☀/☾ switches.
+const BG = 'var(--bg)'
+const BG2 = 'var(--bg2)'
+const BG3 = 'var(--bg3)'
+const BORDER = 'var(--border)'
+const BORDER2 = 'var(--border2)'
+const TEXT = 'var(--text)'
+const MUTED = 'var(--muted)'
+const FAINT = 'var(--faint)'   // small labels and icons (was #333/#444 on black: too dim to see)
+const TINT = 'var(--tint)'     // barely-there row and hover backgrounds
 const ACCENT = '#7B6EF6'
+
+const THEME_CSS = `
+  :root, :root[data-theme=light] {
+    --bg: #f6f5f2; --bg2: #ffffff; --bg3: #efede8;
+    --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.15);
+    --text: #1d1c1a; --muted: #6a665f; --faint: #858079; --tint: rgba(0,0,0,0.03); --scroll: #ccc;
+    color-scheme: light;
+  }
+  :root[data-theme=dark] {
+    --bg: #080808; --bg2: #101010; --bg3: #161616;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --text: #f0f0ee; --muted: #8a8a88; --faint: #6a6a68; --tint: rgba(255,255,255,0.03); --scroll: #222;
+    color-scheme: dark;
+  }
+`
+const THEME_KEY = 'easonet_theme'
+type Theme = 'light' | 'dark'
+function loadTheme(): Theme {
+  try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light' } catch { return 'light' }
+}
+
+// Signatures are saved as HTML (links, bold, shop logo). Ones saved before Nov 2026 are plain
+// text: those are escaped and their line breaks kept.
+function signatureToHtml(sig: string | null | undefined): string {
+  if (!sig) return ''
+  return /<[a-z][\s\S]*>/i.test(sig) ? sanitizeEmailHtml(sig) : sanitizeEmailHtml(autoLinkHtml(escapeHtml(sig).replace(/\n/g, '<br>')))
+}
+// What a new message or reply starts with: two blank lines, then the signature. (No "-- " line:
+// sellers found the two dashes odd and kept deleting them.)
+function signatureBlock(sig: string | null | undefined): string {
+  const html = signatureToHtml(sig)
+  return html ? `<br><br>${html}` : ''
+}
+
+// Turns typed web addresses in a signature into links (facebook.com/x, www.x.com, https://…),
+// leaving text that's already a link alone.
+function autoLinkHtml(html: string): string {
+  if (typeof document === 'undefined') return html
+  const root = document.createElement('div')
+  root.innerHTML = html
+  const re = /\b((?:https?:\/\/|www\.)[^\s<]+|(?:facebook|instagram|tiktok|pinterest|youtube)\.com\/[^\s<]+)/gi
+  const walk = (node: Node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 1) { if ((child as Element).tagName !== 'A') walk(child) ; continue }
+      if (child.nodeType !== 3) continue
+      const text = child.textContent || ''
+      if (!re.test(text)) continue
+      re.lastIndex = 0
+      const frag = document.createDocumentFragment()
+      let last = 0
+      text.replace(re, (m, _g, offset: number) => {
+        const url = m.replace(/[.,;:!?)]+$/, '')
+        frag.append(text.slice(last, offset))
+        const a = document.createElement('a')
+        a.href = /^https?:\/\//i.test(url) ? url : `https://${url}`
+        a.textContent = url
+        frag.append(a)
+        last = offset + url.length
+        return m
+      })
+      frag.append(text.slice(last))
+      child.replaceWith(frag)
+    }
+  }
+  walk(root)
+  return root.innerHTML
+}
 
 function api(url: string) { return authFetch(url).then(r => r.json()) }
 function post(url: string, body: object) { return authFetch(url, { method: 'POST', body: JSON.stringify(body) }) }
@@ -71,6 +154,7 @@ interface ComposeDraft {
   subject: string
   text: string
   attachments: StagedAttachment[]
+  threadId?: string | null
 }
 
 function loadDraft(): ComposeDraft | null {
@@ -170,14 +254,14 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT, textTransform: 'uppercase' as const, letterSpacing: '.1em', marginBottom: 14 }}>{label}</div>
       {fields.map(f => (
         <div key={f.k} style={{ marginBottom: 10 }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#444', marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '.05em' }}>{f.k}</div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '.05em' }}>{f.k}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: TEXT, flex: 1, wordBreak: 'break-all' as const }}>{f.v}</span>
             <button onClick={() => copy(f.v)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, padding: '3px 10px', border: `1px solid ${BORDER2}`, borderRadius: 5, cursor: 'pointer', background: 'transparent', color: MUTED, whiteSpace: 'nowrap' as const, flexShrink: 0 }}>copy</button>
           </div>
         </div>
       ))}
-      {extra && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#555', marginTop: 8 }}>{extra}</div>}
+      {extra && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED, marginTop: 8 }}>{extra}</div>}
     </div>
   )
 
@@ -188,15 +272,15 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
 
       {/* Provider selector */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase' as const, letterSpacing: '.1em', marginBottom: 10 }}>// your dns provider</div>
-        <div style={{ display: 'flex', gap: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 3, width: 'fit-content' }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, textTransform: 'uppercase' as const, letterSpacing: '.1em', marginBottom: 10 }}>// your dns provider</div>
+        <div style={{ display: 'flex', gap: 1, background: TINT, borderRadius: 8, padding: 3, width: 'fit-content' }}>
           {DNS_PROVIDERS.map(p => (
             <button key={p} onClick={() => setProvider(p)} style={{ padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: "'DM Mono', monospace", fontSize: 11, background: provider === p ? ACCENT : 'transparent', color: provider === p ? '#fff' : MUTED, transition: 'all .15s' }}>
               {p}
             </button>
           ))}
         </div>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', marginTop: 10 }}>// navigate to: {providerNote[provider]}</div>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: FAINT, marginTop: 10 }}>// navigate to: {providerNote[provider]}</div>
       </div>
 
       <RecordBox label="MX record — inbound routing" fields={[
@@ -212,7 +296,7 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
         { k: 'Value / Content', v: 'v=spf1 include:_spf.brevo.com ~all' },
       ]} />
 
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: '#444', fontFamily: "'DM Mono', monospace" }}>
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: TINT, border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 12, color: FAINT, fontFamily: "'DM Mono', monospace" }}>
         // need help? <a href="/setup" target="_blank" style={{ color: ACCENT, textDecoration: 'none' }}>view full setup guide →</a>
       </div>
 
@@ -220,20 +304,20 @@ function DnsWizard({ identity, onVerified }: { identity: Identity; onVerified: (
         <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[{ label: 'MX record', ok: dns?.mx }, { label: 'SPF record', ok: dns?.spf }].map(r => (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: r.ok === undefined ? '#222' : r.ok ? 'rgba(62,207,142,0.15)' : 'rgba(255,107,107,0.15)', border: `1px solid ${r.ok === undefined ? '#333' : r.ok ? 'rgba(62,207,142,0.4)' : 'rgba(255,107,107,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: r.ok ? '#3ECF8E' : '#ff6b6b', flexShrink: 0 }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', background: r.ok === undefined ? BG3 : r.ok ? 'rgba(62,207,142,0.15)' : 'rgba(255,107,107,0.15)', border: `1px solid ${r.ok === undefined ? FAINT : r.ok ? 'rgba(62,207,142,0.4)' : 'rgba(255,107,107,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: r.ok ? '#3ECF8E' : '#ff6b6b', flexShrink: 0 }}>
                 {r.ok === undefined ? '' : r.ok ? '✓' : '✗'}
               </div>
               <span style={{ color: r.ok ? '#3ECF8E' : MUTED }}>{r.label} {r.ok ? 'verified' : 'checking…'}</span>
             </div>
           ))}
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', marginTop: 4 }}>// polling every 4 seconds — dns can take up to 10 mins</div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: FAINT, marginTop: 4 }}>// polling every 4 seconds — dns can take up to 10 mins</div>
         </div>
       )}
 
       <button
         onClick={startChecking}
         disabled={step === 'checking'}
-        style={{ padding: '10px 24px', background: step === 'checking' ? '#1a1a1a' : ACCENT, color: step === 'checking' ? MUTED : '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: step === 'checking' ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+        style={{ padding: '10px 24px', background: step === 'checking' ? BG3 : ACCENT, color: step === 'checking' ? MUTED : '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: step === 'checking' ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}
       >
         {step === 'checking' ? 'Checking…' : "I've added the records — verify now"}
       </button>
@@ -316,6 +400,22 @@ export default function App() {
   // own self-serve users.
   const sellerMode = identities.length > 0 && identities.every(i => i.hosted)
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  // Full reply (the Reply button): the compose window, sent into this thread.
+  const [composeThreadId, setComposeThreadId] = useState<string | null>(null)
+  // Minimised compose shrinks to a bar so the open email's quick-reply Send button isn't hidden.
+  const [composeMinimised, setComposeMinimised] = useState(false)
+  const [theme, setTheme] = useState<Theme>('light')
+  const signatureBodyRef = useRef<HTMLDivElement>(null)
+  const [shopLogoBusy, setShopLogoBusy] = useState(false)
+  const [signatureNote, setSignatureNote] = useState('')
+
+  useEffect(() => { setTheme(loadTheme()) }, [])
+  useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
+  function toggleTheme() {
+    const next: Theme = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    try { localStorage.setItem(THEME_KEY, next) } catch {}
+  }
 
   useEffect(() => {
     try {
@@ -419,11 +519,11 @@ export default function App() {
     const t = setTimeout(() => {
       const isEmpty = !composeTo && !composeCc && !composeBcc && !composeSubject && !composeText && composeAttachments.length === 0
       if (isEmpty) return
-      saveDraft({ identityId: composeIdentityId, to: composeTo, cc: composeCc, bcc: composeBcc, showCcBcc, subject: composeSubject, text: composeText, attachments: composeAttachments })
+      saveDraft({ identityId: composeIdentityId, to: composeTo, cc: composeCc, bcc: composeBcc, showCcBcc, subject: composeSubject, text: composeText, attachments: composeAttachments, threadId: composeThreadId })
       setHasDraft(true)
     }, 400)
     return () => clearTimeout(t)
-  }, [composing, composeIdentityId, composeTo, composeCc, composeBcc, showCcBcc, composeSubject, composeText, composeAttachments])
+  }, [composing, composeIdentityId, composeTo, composeCc, composeBcc, showCcBcc, composeSubject, composeText, composeAttachments, composeThreadId])
 
   // Debounce the search box into `search`
   useEffect(() => {
@@ -444,10 +544,7 @@ export default function App() {
       if (isTyping) return
       if (e.key === 'c' && !composing) {
         e.preventDefault()
-        const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
-        setComposeText(identity?.signature ? `<br><br>-- <br>${escapeHtml(identity.signature).replace(/\n/g, '<br>')}` : '')
-        setComposeSyncToken(t => t + 1)
-        setComposing(true)
+        openCompose()
       } else if (e.key === '/') {
         e.preventDefault()
         document.getElementById('thread-search')?.focus()
@@ -464,6 +561,34 @@ export default function App() {
     setActiveThread(thread)
     const others = thread.participants.filter(p => p !== thread.identity.email)
     setReplyCc(others.slice(1).join(', '))
+    // Opening another email while writing one: tuck the compose window down to a bar so this
+    // email's quick-reply box and Send button aren't hidden under it.
+    if (composing) setComposeMinimised(true)
+  }
+
+  // The Reply button: the full editor (formatting, attachments, signature) with the customer's
+  // address, "Re:" subject and the last message quoted, sent into the same thread.
+  function replyInFull() {
+    if (!activeThread) return
+    const thread = activeThread
+    const others = thread.participants.filter(p => p !== thread.identity.email)
+    const last = thread.messages[thread.messages.length - 1]
+    const quoted = last
+      ? `<br><blockquote>On ${escapeHtml(formatDateTime(last.createdAt))}, ${escapeHtml(senderName(last.fromAddress))} wrote:<br>${last.bodyHtml ? sanitizeEmailHtml(last.bodyHtml) : escapeHtml(last.bodyText).replace(/\n/g, '<br>')}</blockquote>`
+      : ''
+    setComposeIdentityId(thread.identity.id)
+    setComposeTo(others[0] ?? thread.participants[0] ?? '')
+    setComposeCc(replyCc)
+    setComposeBcc('')
+    setShowCcBcc(!!replyCc)
+    setComposeSubject(`Re: ${normalizeSubject(thread.subject)}`)
+    setComposeText(signatureBlock(thread.identity.signature ?? identities.find(i => i.id === thread.identity.id)?.signature) + quoted)
+    setComposeSyncToken(t => t + 1)
+    setComposeAttachments([])
+    setComposeError('')
+    setComposeThreadId(thread.id)
+    setComposeMinimised(false)
+    setComposing(true)
   }
 
   async function setThreadArchived(threadId: string, archived: boolean) {
@@ -516,13 +641,17 @@ export default function App() {
     setComposeSyncToken(t => t + 1)
     setComposeAttachments((m.attachments ?? []).map(a => ({ attachmentId: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size })))
     setComposeError('')
+    setComposeThreadId(null)
+    setComposeMinimised(false)
     setComposing(true)
   }
 
   function openCompose() {
     const identity = identities.find(i => i.id === composeIdentityId) ?? identities[0]
-    setComposeText(identity?.signature ? `<br><br>-- <br>${escapeHtml(identity.signature).replace(/\n/g, '<br>')}` : '')
+    setComposeText(signatureBlock(identity?.signature))
     setComposeSyncToken(t => t + 1)
+    setComposeThreadId(null)
+    setComposeMinimised(false)
     setComposing(true)
   }
 
@@ -539,11 +668,14 @@ export default function App() {
     setComposeSyncToken(t => t + 1)
     setComposeAttachments(draft.attachments)
     setComposeError('')
+    setComposeThreadId(draft.threadId ?? null)
+    setComposeMinimised(false)
     setComposing(true)
   }
 
   function discardCompose() {
     setComposing(false)
+    setComposeThreadId(null)
     setComposeError('')
     setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false)
     setComposeSubject(''); setComposeText(''); setComposeSyncToken(t => t + 1); setComposeAttachments([])
@@ -554,16 +686,62 @@ export default function App() {
   async function saveSignature() {
     if (!editingSignatureIdentity) return
     setSignatureSaving(true)
+    setSignatureNote('')
     try {
-      const res = await patch(`/api/identities/${editingSignatureIdentity.id}`, { signature: signatureDraft || null })
+      const raw = signatureBodyRef.current?.innerHTML ?? ''
+      const html = sanitizeEmailHtml(autoLinkHtml(raw)).trim()
+      const empty = !htmlToPlainText(html) && !/<img/i.test(html)
+      const res = await patch(`/api/identities/${editingSignatureIdentity.id}`, { signature: empty ? null : html })
       if (res.ok) {
         const updated = await res.json()
         setIdentities(prev => prev.map(i => i.id === updated.id ? { ...i, signature: updated.signature } : i))
         setEditingSignatureIdentity(null)
+      } else {
+        setSignatureNote('Couldn’t save your signature. It may be too long.')
       }
     } finally {
       setSignatureSaving(false)
     }
+  }
+
+  function openSignatureEditor(id: Identity) {
+    setEditingSignatureIdentity(id)
+    setSignatureDraft(signatureToHtml(id.signature))
+    setSignatureNote('')
+  }
+
+  // Fill the signature editor once when it opens (uncontrolled contentEditable, like compose).
+  useEffect(() => {
+    if (editingSignatureIdentity && signatureBodyRef.current) signatureBodyRef.current.innerHTML = signatureDraft
+  }, [editingSignatureIdentity])
+
+  // "Add my shop logo": the logo from the seller's OzStorehouse website, put at the bottom.
+  async function addShopLogo() {
+    if (!editingSignatureIdentity || !signatureBodyRef.current) return
+    setShopLogoBusy(true)
+    setSignatureNote('')
+    try {
+      const data = await api(`/api/identities/shop-logo?identityId=${encodeURIComponent(editingSignatureIdentity.id)}`)
+      if (!data.logo) { setSignatureNote(data.error || 'No logo found. Add one in the Website tab of your OzStorehouse seller portal first.'); return }
+      const el = signatureBodyRef.current
+      el.querySelectorAll('img').forEach(img => img.remove())
+      el.insertAdjacentHTML('beforeend', `<br><img src="${escapeHtml(data.logo).replace(/"/g, '&quot;')}" alt="${escapeHtml(editingSignatureIdentity.name).replace(/"/g, '&quot;')}" width="160">`)
+    } catch {
+      setSignatureNote('Couldn’t fetch your logo. Please try again.')
+    } finally {
+      setShopLogoBusy(false)
+    }
+  }
+
+  function signatureLink() {
+    const url = prompt('Link address (for example facebook.com/yourshop)')
+    if (!url) return
+    const href = /^https?:\/\//i.test(url) ? url : `https://${url}`
+    signatureBodyRef.current?.focus()
+    const sel = window.getSelection()
+    // Nothing selected: put the address itself in as the link text.
+    if (!sel || sel.isCollapsed) document.execCommand('insertHTML', false, `<a href="${escapeHtml(href).replace(/"/g, '&quot;')}">${escapeHtml(url)}</a>&nbsp;`)
+    else document.execCommand('createLink', false, href)
   }
 
   async function stageAttachments(files: FileList | null) {
@@ -614,13 +792,16 @@ export default function App() {
     setComposeSending(true)
     setComposeError('')
     try {
-      const res = await post('/api/emails/send', { identityId: composeIdentityId, to: composeTo, cc: composeCc || undefined, bcc: composeBcc || undefined, subject: composeSubject, text: plainText, html: sanitizeEmailHtml(composeText), attachments: composeAttachments })
+      const res = await post('/api/emails/send', { identityId: composeIdentityId, to: composeTo, cc: composeCc || undefined, bcc: composeBcc || undefined, subject: composeSubject, text: plainText, html: sanitizeEmailHtml(composeText), attachments: composeAttachments, threadId: composeThreadId || undefined })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setComposeError(data.error ? JSON.stringify(data.error) : 'Failed to send — please try again')
         return
       }
+      const repliedThread = composeThreadId
       setComposing(false)
+      setComposeThreadId(null)
+      if (repliedThread && activeThread?.id === repliedThread) openThread(activeThread)
       setComposeTo(''); setComposeCc(''); setComposeBcc(''); setShowCcBcc(false); setComposeSubject(''); setComposeText(''); setComposeSyncToken(t => t + 1); setComposeAttachments([])
       clearDraft()
       setHasDraft(false)
@@ -652,9 +833,10 @@ export default function App() {
   }
 
   if (loading) return (
-    <div style={{ background: BG, height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#333' }}>
+    <div style={{ background: BG, height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: "'DM Mono', monospace", fontSize: 12, color: FAINT }}>
+      <style>{THEME_CSS}</style>
       // loading…
-      <button onClick={logout} style={{ padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'transparent', color: '#666', fontFamily: "'DM Mono', monospace" }}>Sign out</button>
+      <button onClick={logout} style={{ padding: '6px 14px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 11, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>Sign out</button>
     </div>
   )
 
@@ -682,15 +864,18 @@ export default function App() {
         <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
       <style>{`
+        ${THEME_CSS}
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: ${BG}; color: ${TEXT}; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 4px; }
         select option { background: ${BG2}; color: ${TEXT}; }
-        .rte-body:empty:before { content: attr(data-placeholder); color: #444; pointer-events: none; }
+        .rte-body:empty:before { content: attr(data-placeholder); color: var(--faint); pointer-events: none; }
         .rte-body a { color: inherit; text-decoration: underline; }
         .rte-body ul, .rte-body ol { padding-left: 20px; }
+        .rte-body blockquote { margin: 8px 0; padding-left: 10px; border-left: 2px solid var(--border2); color: var(--muted); }
+        .rte-body img { max-width: 100%; height: auto; }
         .app-hamburger { display: none; }
         .app-sidebar-backdrop { display: none; }
         /* dvh = the visible height on phones (100vh runs under iOS Safari's toolbar, hiding the reply box) */
@@ -720,6 +905,7 @@ export default function App() {
           .app-hamburger { display: flex !important; }
           .app-sidebar-backdrop.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 39; }
           .app-compose-panel { width: 100vw !important; right: 0 !important; left: 0 !important; bottom: 0 !important; border-radius: 0 !important; max-height: 85vh; }
+          .app-compose-bar { padding: 10px 12px !important; }
         }
       `}</style>
 
@@ -752,14 +938,14 @@ export default function App() {
             {/* Identities */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
               <div style={{ padding: '0 16px', marginBottom: 10 }}>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>{sellerMode ? '// your addresses' : '// identities'}</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>{sellerMode ? '// your addresses' : '// identities'}</div>
 
                 {/* All inboxes */}
                 <div
                   onClick={() => { setActiveIdentityId(null); setActiveThread(null); setFolder('inbox'); setSidebarOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId && folder === 'inbox' ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: !activeIdentityId && folder === 'inbox' ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: !activeIdentityId && folder === 'inbox' ? TINT : 'transparent', marginBottom: 2, border: !activeIdentityId && folder === 'inbox' ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444', flexShrink: 0 }} />
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: FAINT, flexShrink: 0 }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 12, color: !activeIdentityId && folder === 'inbox' ? TEXT : MUTED, fontWeight: !activeIdentityId && folder === 'inbox' ? 500 : 400 }}>All inboxes</div>
                     {unreadCount > 0 && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: ACCENT }}>{unreadCount} unread</div>}
@@ -769,16 +955,16 @@ export default function App() {
                 {/* Archived */}
                 <div
                   onClick={() => { setActiveIdentityId(null); setActiveThread(null); setFolder('archived'); setSidebarOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'archived' ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: folder === 'archived' ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'archived' ? TINT : 'transparent', marginBottom: 2, border: folder === 'archived' ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#555', flexShrink: 0 }} />
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: MUTED, flexShrink: 0 }} />
                   <div style={{ fontSize: 12, color: folder === 'archived' ? TEXT : MUTED, fontWeight: folder === 'archived' ? 500 : 400 }}>Archived</div>
                 </div>
 
                 {/* Spam */}
                 <div
                   onClick={() => { setActiveIdentityId(null); setActiveThread(null); setFolder('spam'); setSidebarOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'spam' ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: folder === 'spam' ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'spam' ? TINT : 'transparent', marginBottom: 2, border: folder === 'spam' ? `1px solid ${BORDER}` : '1px solid transparent' }}
                 >
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#c0392b', flexShrink: 0 }} />
                   <div style={{ fontSize: 12, color: folder === 'spam' ? TEXT : MUTED, fontWeight: folder === 'spam' ? 500 : 400 }}>Spam</div>
@@ -788,7 +974,7 @@ export default function App() {
                   <div
                     key={id.id}
                     onClick={() => { setActiveIdentityId(id.id); setActiveThread(null); setFolder('inbox'); setSidebarOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'inbox' && activeIdentityId === id.id ? 'rgba(255,255,255,0.04)' : 'transparent', marginBottom: 2, border: folder === 'inbox' && activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: folder === 'inbox' && activeIdentityId === id.id ? TINT : 'transparent', marginBottom: 2, border: folder === 'inbox' && activeIdentityId === id.id ? `1px solid ${BORDER}` : '1px solid transparent' }}
                   >
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: id.color, flexShrink: 0 }} />
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -797,8 +983,8 @@ export default function App() {
                     </div>
                     <button
                       title="Edit signature"
-                      onClick={e => { e.stopPropagation(); setEditingSignatureIdentity(id); setSignatureDraft(id.signature ?? '') }}
-                      style={{ border: 'none', background: 'none', color: '#333', cursor: 'pointer', fontSize: 11, padding: '2px 4px', flexShrink: 0 }}
+                      onClick={e => { e.stopPropagation(); openSignatureEditor(id) }}
+                      style={{ border: 'none', background: 'none', color: MUTED, cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
                     >✎</button>
                     {!id.dnsVerified && !id.hosted && (
                       <div
@@ -812,7 +998,7 @@ export default function App() {
 
                 {!sellerMode && <button
                   onClick={() => setAddingIdentity(true)}
-                  style={{ width: '100%', textAlign: 'left', padding: '7px 10px', fontSize: 11, color: '#333', border: 'none', background: 'none', cursor: 'pointer', fontFamily: "'DM Mono', monospace", letterSpacing: '.03em' }}
+                  style={{ width: '100%', textAlign: 'left', padding: '7px 10px', fontSize: 11, color: FAINT, border: 'none', background: 'none', cursor: 'pointer', fontFamily: "'DM Mono', monospace", letterSpacing: '.03em' }}
                 >
                   + add identity
                 </button>}
@@ -821,7 +1007,7 @@ export default function App() {
 
             {/* Tools nav */}
             {!sellerMode && <div style={{ padding: '8px 16px', borderTop: `1px solid ${BORDER}` }}>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>// tools</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>// tools</div>
               <a href="/waitlists" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3ECF8E', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>waitlists</div>
@@ -834,7 +1020,7 @@ export default function App() {
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F87171', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>brand pages</div>
               </a>
-              <div style={{ margin: '8px 10px 4px', borderTop: '1px solid rgba(255,255,255,.05)' }} />
+              <div style={{ margin: '8px 10px 4px', borderTop: '1px solid var(--border)' }} />
               <a href={process.env.NEXT_PUBLIC_DISCORD_URL || '#'} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, marginBottom: 2, textDecoration: 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#5865F2', flexShrink: 0 }} />
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>community</div>
@@ -847,7 +1033,7 @@ export default function App() {
 
             {/* User row */}
             <div style={{ padding: '12px 16px', borderTop: `1px solid ${BORDER}` }}>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{user?.email}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 4 }}>{user?.email}</div>
               {!sellerMode && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: user?.plan === 'trial' ? '#F5A623' : '#3ECF8E', background: user?.plan === 'trial' ? 'rgba(245,166,35,0.1)' : 'rgba(62,207,142,0.1)', border: `1px solid ${user?.plan === 'trial' ? 'rgba(245,166,35,0.2)' : 'rgba(62,207,142,0.2)'}`, padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase' as const, letterSpacing: '.08em' }}>
                   {user?.plan === 'trial' ? 'trial' : user?.plan}
@@ -900,6 +1086,7 @@ export default function App() {
                     <button onClick={resumeDraft} title="Resume your saved draft" style={{ padding: '7px 14px', border: `1px solid ${BORDER2}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: ACCENT, fontFamily: "'DM Mono', monospace" }}>Resume draft</button>
                   )}
                   <button onClick={openCompose} title="Compose (c)" style={{ padding: '7px 18px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Compose</button>
+                  <button onClick={toggleTheme} title={theme === 'light' ? 'Switch to dark' : 'Switch to light'} aria-label={theme === 'light' ? 'Switch to dark' : 'Switch to light'} style={{ padding: '6px 10px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED }}>{theme === 'light' ? '☾' : '☀'}</button>
                   <button className="app-toolbar-signout" onClick={logout} title="Sign out" style={{ padding: '6px 12px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Mono', monospace" }}>⏻</button>
                 </div>
 
@@ -983,7 +1170,7 @@ export default function App() {
                           )}
                           <button
                             onClick={() => forwardMessage(m)}
-                            style={{ marginTop: 6, padding: '3px 10px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 10, color: '#444', fontFamily: "'DM Mono', monospace" }}
+                            style={{ marginTop: 6, padding: '3px 10px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 10, color: FAINT, fontFamily: "'DM Mono', monospace" }}
                           >↪ forward</button>
                         </div>
                       ))}
@@ -993,18 +1180,23 @@ export default function App() {
                         <div style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 7, color: '#ff6b6b', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{replyError}</div>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', flexShrink: 0 }}>cc</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, flexShrink: 0 }}>cc</span>
                         <input
                           value={replyCc}
                           onChange={e => setReplyCc(e.target.value)}
                           placeholder="cc@example.com"
                           style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 6, padding: '5px 10px', fontSize: 12, color: TEXT, outline: 'none', fontFamily: "'DM Sans', sans-serif" }}
                         />
+                        <button
+                          onClick={replyInFull}
+                          title="Reply with formatting, attachments and your signature"
+                          style={{ padding: '5px 14px', border: `1px solid ${ACCENT}`, borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', background: 'transparent', color: ACCENT, fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}
+                        >↩ Reply</button>
                       </div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         <textarea
                           id="quick-reply"
-                          placeholder="// quick reply… (⌘/Ctrl+Enter to send)"
+                          placeholder={(activeThread.identity.signature ?? identities.find(i => i.id === activeThread.identity.id)?.signature) ? 'Quick reply, your signature is added (⌘/Ctrl+Enter to send)' : 'Quick reply (⌘/Ctrl+Enter to send)'}
                           style={{ flex: 1, background: BG3, border: `1px solid ${BORDER}`, borderRadius: 8, padding: '10px 14px', fontSize: 13, color: TEXT, resize: 'none', outline: 'none', height: 64, fontFamily: "'DM Sans', sans-serif" }}
                           onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.getElementById('quick-reply-send')?.click() } }}
                         />
@@ -1017,12 +1209,17 @@ export default function App() {
                             try {
                               const others = activeThread.participants.filter(p => p !== activeThread.identity.email)
                               const replyTo = others[0] ?? activeThread.participants[0]
+                              // Quick replies carry the signature too (they used to go out without it).
+                              const sigHtml = signatureToHtml(activeThread.identity.signature ?? identities.find(i => i.id === activeThread.identity.id)?.signature)
+                              const bodyHtml = escapeHtml(el.value).replace(/\n/g, '<br>')
+                              const html = sigHtml ? `${bodyHtml}<br><br>${sigHtml}` : bodyHtml
                               const res = await post('/api/emails/send', {
                                 identityId: activeThread.identity.id,
                                 to: replyTo,
                                 cc: replyCc || undefined,
-                                subject: `Re: ${activeThread.subject}`,
-                                text: el.value,
+                                subject: `Re: ${normalizeSubject(activeThread.subject)}`,
+                                text: sigHtml ? `${el.value}\n\n${htmlToPlainText(sigHtml)}` : el.value,
+                                html: sanitizeEmailHtml(html),
                                 threadId: activeThread.id,
                               })
                               if (!res.ok) {
@@ -1047,7 +1244,7 @@ export default function App() {
                   <div style={{ flex: 1, overflowY: 'auto' }}>
                     {visibleThreads.length === 0 ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#333' }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: FAINT }}>
                           {identities.length === 0 ? '// add your first identity to get started' : '// no emails yet'}
                         </div>
                         {identities.length === 0 && (
@@ -1071,9 +1268,9 @@ export default function App() {
                           key={t.id}
                           onClick={() => openThread(t)}
                           className="app-thread-row"
-                          style={{ display: 'flex', gap: 14, padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isUnread ? 'rgba(255,255,255,0.015)' : 'transparent', alignItems: 'flex-start' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = isUnread ? 'rgba(255,255,255,0.015)' : 'transparent')}
+                          style={{ display: 'flex', gap: 14, padding: '14px 24px', borderBottom: `1px solid ${BORDER}`, cursor: 'pointer', background: isUnread ? TINT : 'transparent', alignItems: 'flex-start' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = TINT)}
+                          onMouseLeave={e => (e.currentTarget.style.background = isUnread ? TINT : 'transparent')}
                         >
                           <div style={{ width: 36, height: 36, borderRadius: '50%', background: (t.identity?.color ?? ACCENT) + '18', color: t.identity?.color ?? ACCENT, border: `1px solid ${(t.identity?.color ?? ACCENT)}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0, fontFamily: "'DM Mono', monospace" }}>
                             {initials}
@@ -1084,13 +1281,13 @@ export default function App() {
                                 {otherParty}
                                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: t.identity?.color, padding: '2px 8px', border: `1px solid ${(t.identity?.color ?? ACCENT)}30`, borderRadius: 100, marginLeft: 8 }}>{t.identity?.name}</span>
                               </span>
-                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', whiteSpace: 'nowrap' }}>{formatDay(t.lastAt)}</span>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, whiteSpace: 'nowrap' }}>{formatDay(t.lastAt)}</span>
                             </div>
                             {otherPartyEmail && otherPartyEmail.toLowerCase() !== otherParty.toLowerCase() && (
                               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 3 }}>{otherPartyEmail}</div>
                             )}
                             <div style={{ fontSize: 13, fontWeight: isUnread ? 500 : 400, color: isUnread ? TEXT : MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 2 }}>{t.subject}</div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: FAINT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {lastMsg?._count?.attachments ? '📎 ' : ''}{lastMsg?.bodyText?.slice(0, 80) ?? ''}
                             </div>
                           </div>
@@ -1112,11 +1309,23 @@ export default function App() {
                 )}
 
                 {/* Compose panel */}
-                {composing && (
-                  <div className="app-compose-panel" style={{ position: 'absolute', bottom: 0, right: 0, width: 500, background: BG2, border: `1px solid ${BORDER2}`, borderRadius: '12px 12px 0 0', display: 'flex', flexDirection: 'column', zIndex: 10 }}>
+                {composing && composeMinimised && (
+                  // Minimised: a strip of its own under everything (not floating), so it can never
+                  // cover the open email's quick-reply box or Send button.
+                  <div className="app-compose-bar" onClick={() => setComposeMinimised(false)} title="Open your message" style={{ flexShrink: 0, background: BG3, borderTop: `1px solid ${BORDER2}`, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 24px', cursor: 'pointer' }}>
+                    <span style={{ flex: 1, fontSize: 12, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {composeSubject || (composeThreadId ? 'Reply' : 'New message')}</span>
+                    <span style={{ fontSize: 13, color: MUTED }}>▴</span>
+                    <button onClick={e => { e.stopPropagation(); setComposing(false) }} title="Close (saved as a draft)" style={{ fontSize: 13, color: MUTED, border: 'none', background: 'none', cursor: 'pointer' }}>✕</button>
+                  </div>
+                )}
+                {composing && !composeMinimised && (
+                  <div className="app-compose-panel" style={{ position: 'absolute', bottom: 0, right: 0, width: 500, background: BG2, border: `1px solid ${BORDER2}`, borderRadius: '12px 12px 0 0', display: 'flex', flexDirection: 'column', zIndex: 10, boxShadow: '0 -6px 24px rgba(0,0,0,0.12)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', borderBottom: `1px solid ${BORDER}`, background: BG3, borderRadius: '12px 12px 0 0' }}>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>// new message</span>
-                      <button onClick={() => setComposing(false)} style={{ fontSize: 14, color: MUTED, border: 'none', background: 'none', cursor: 'pointer' }}>✕</button>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: MUTED }}>{composeThreadId ? '// reply' : '// new message'}</span>
+                      <span style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => setComposeMinimised(true)} title="Minimise" aria-label="Minimise" style={{ fontSize: 14, color: MUTED, border: 'none', background: 'none', cursor: 'pointer', padding: '0 6px' }}>▾</button>
+                        <button onClick={() => setComposing(false)} title="Close (saved as a draft)" aria-label="Close" style={{ fontSize: 14, color: MUTED, border: 'none', background: 'none', cursor: 'pointer', padding: '0 6px' }}>✕</button>
+                      </span>
                     </div>
                     {[
                       { label: 'from', content: (
@@ -1128,7 +1337,7 @@ export default function App() {
                         <div style={{ display: 'flex', flex: 1, alignItems: 'center', gap: 8 }}>
                           <input style={{ ...inputStyle, flex: 1, background: 'transparent', border: 'none', padding: 0 }} placeholder="recipient@example.com, another@example.com" value={composeTo} onChange={e => setComposeTo(e.target.value)} />
                           {!showCcBcc && (
-                            <button onClick={() => setShowCcBcc(true)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#444', border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>Cc/Bcc</button>
+                            <button onClick={() => setShowCcBcc(true)} style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: FAINT, border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 }}>Cc/Bcc</button>
                           )}
                         </div>
                       )},
@@ -1139,7 +1348,7 @@ export default function App() {
                       { label: 'subj', content: <input style={{ ...inputStyle, background: 'transparent', border: 'none', padding: 0 }} placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} /> },
                     ].map(f => (
                       <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: `1px solid ${BORDER}` }}>
-                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#333', width: 30, flexShrink: 0 }}>{f.label}</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, width: 30, flexShrink: 0 }}>{f.label}</span>
                         {f.content}
                       </div>
                     ))}
@@ -1193,7 +1402,7 @@ export default function App() {
                       <div style={{ margin: '0 18px 12px', padding: '8px 12px', background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.25)', borderRadius: 7, color: '#ff6b6b', fontSize: 12, fontFamily: "'DM Mono', monospace" }}>{composeError}</div>
                     )}
                     <div style={{ display: 'flex', gap: 8, padding: '12px 18px', borderTop: `1px solid ${BORDER}` }}>
-                      <button onClick={sendEmail} disabled={composeSending} style={{ padding: '8px 20px', background: composeSending ? '#333' : ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: composeSending ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                      <button onClick={sendEmail} disabled={composeSending} style={{ padding: '8px 20px', background: composeSending ? FAINT : ACCENT, color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: composeSending ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
                         {composeSending ? 'Sending…' : 'Send →'}
                       </button>
                       <button onClick={discardCompose} style={{ padding: '8px 16px', border: `1px solid ${BORDER}`, borderRadius: 7, fontSize: 13, cursor: 'pointer', background: 'transparent', color: MUTED, fontFamily: "'DM Sans', sans-serif" }}>Discard</button>
@@ -1216,19 +1425,19 @@ export default function App() {
           <div style={{ background: BG2, border: `1px solid ${BORDER2}`, borderRadius: 14, padding: 32, width: 420, display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
               <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, letterSpacing: -0.5, color: TEXT, marginBottom: 6 }}>Add identity</div>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333' }}>// new domain email address</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: FAINT }}>// new domain email address</div>
             </div>
             {[
               { label: 'display name', placeholder: 'e.g. Topyn', value: newName, set: setNewName },
               { label: 'email address', placeholder: 'mark@topyn.com', value: newEmail, set: setNewEmail },
             ].map(f => (
               <div key={f.label}>
-                <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#444', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>{f.label}</label>
+                <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.08em' }}>{f.label}</label>
                 <input style={inputStyle} placeholder={f.placeholder} value={f.value} onChange={e => f.set(e.target.value)} />
               </div>
             ))}
             <div>
-              <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#444', display: 'block', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.08em' }}>colour</label>
+              <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: FAINT, display: 'block', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.08em' }}>colour</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {COLORS.map(c => (
                   <div key={c} onClick={() => setNewColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: newColor === c ? `2px solid ${TEXT}` : '2px solid transparent', boxSizing: 'border-box' }} />
@@ -1252,17 +1461,36 @@ export default function App() {
       {/* Signature editor modal */}
       {editingSignatureIdentity && (
         <div onClick={e => e.target === e.currentTarget && setEditingSignatureIdentity(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
-          <div style={{ background: BG2, border: `1px solid ${BORDER2}`, borderRadius: 14, padding: 32, width: 420, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ background: BG2, color: TEXT, fontFamily: "'DM Sans', sans-serif", border: `1px solid ${BORDER2}`, borderRadius: 14, padding: 28, width: 460, maxWidth: 'calc(100vw - 32px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, letterSpacing: -0.5, color: TEXT, marginBottom: 6 }}>Signature</div>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#333' }}>// appended to new messages from {editingSignatureIdentity.email}</div>
+              <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>Added to new emails, replies and quick replies from {editingSignatureIdentity.email}. Web addresses like facebook.com/yourshop become links when you save.</div>
             </div>
-            <textarea
-              value={signatureDraft}
-              onChange={e => setSignatureDraft(e.target.value)}
-              placeholder={`${editingSignatureIdentity.name}\n${editingSignatureIdentity.email}`}
-              style={{ ...inputStyle, minHeight: 100, resize: 'vertical', fontFamily: "'DM Mono', monospace" }}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { label: 'B', cmd: 'bold', style: { fontWeight: 700 } },
+                { label: 'I', cmd: 'italic', style: { fontStyle: 'italic' as const } },
+              ].map(b => (
+                <button key={b.cmd} onMouseDown={e => e.preventDefault()} onClick={() => { document.execCommand(b.cmd); signatureBodyRef.current?.focus() }}
+                  style={{ width: 28, height: 28, border: `1px solid ${BORDER2}`, borderRadius: 6, background: 'transparent', color: TEXT, cursor: 'pointer', fontSize: 12, ...b.style }}>{b.label}</button>
+              ))}
+              <button onMouseDown={e => e.preventDefault()} onClick={signatureLink}
+                style={{ height: 28, padding: '0 10px', border: `1px solid ${BORDER2}`, borderRadius: 6, background: 'transparent', color: TEXT, cursor: 'pointer', fontSize: 12 }}>🔗 Link</button>
+              {editingSignatureIdentity.hosted && (
+                <button onClick={addShopLogo} disabled={shopLogoBusy}
+                  style={{ height: 28, padding: '0 10px', border: `1px solid ${BORDER2}`, borderRadius: 6, background: 'transparent', color: TEXT, cursor: shopLogoBusy ? 'wait' : 'pointer', fontSize: 12 }}>{shopLogoBusy ? 'Getting logo…' : '🖼 Add my shop logo'}</button>
+              )}
+            </div>
+            <div
+              ref={signatureBodyRef}
+              className="rte-body"
+              contentEditable
+              suppressContentEditableWarning
+              data-placeholder={`${editingSignatureIdentity.name}\n${editingSignatureIdentity.email}`}
+              style={{ ...inputStyle, minHeight: 120, maxHeight: 320, overflowY: 'auto', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}
             />
+            <div style={{ fontSize: 11, color: MUTED }}>To remove the logo, click it and press Delete.</div>
+            {signatureNote && <div style={{ fontSize: 12, color: '#c0392b' }}>{signatureNote}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={saveSignature} disabled={signatureSaving} style={{ padding: '10px 24px', background: ACCENT, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: signatureSaving ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
                 {signatureSaving ? 'Saving…' : 'Save'}
