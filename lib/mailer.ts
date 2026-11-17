@@ -23,6 +23,17 @@ export function sendsViaSes(identity: Pick<Identity, 'email'>): boolean {
   return !!process.env.SES_SMTP_USER && !!process.env.SES_SMTP_PASS && sesDomains().includes(domain)
 }
 
+// For mail we send on a seller's behalf that isn't from one of their identities (the copy of
+// inbound mail to their personal address, lib/inbound/forwardCopy.ts): can it go via SES from
+// this domain, and the transport + header to use when it can.
+export function sesReadyForDomain(domain: string): boolean {
+  return !!process.env.SES_SMTP_USER && !!process.env.SES_SMTP_PASS && sesDomains().includes(domain.toLowerCase())
+}
+export function sesTransport() {
+  return nodemailer.createTransport({ host: SES_SMTP_HOST, port: 587, secure: false, auth: { user: process.env.SES_SMTP_USER!, pass: process.env.SES_SMTP_PASS! } })
+}
+export const SES_CONFIG_HEADERS = { 'X-SES-CONFIGURATION-SET': SES_CONFIGURATION_SET }
+
 export class SendBlockedError extends Error {}
 
 // Drops suppressed addresses from a comma-separated list; returns what's left and what was dropped.
